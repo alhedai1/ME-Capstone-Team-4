@@ -1,0 +1,1 @@
+{"predictions": {"image": {"width": 720, "height": 1280}, "predictions": [{"width": 271.1720275878906, "height": 215.00433349609375, "x": 511.9990692138672, "y": 617.6683654785156, "confidence": 0.5069126486778259, "class_id": 0, "class": "bell", "detection_id": "5f9db8a3-2a16-4571-8002-65d6e8d6865d", "parent_id": "image"}]}, "visualization": "<deducted_image>"}

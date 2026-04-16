@@ -1,0 +1,48 @@
+ME400 yolo + pi setup
+
+IMPORTANT: Please plug in the pi camera in proper direction BEFORE booting the device
+
+Line by line guides
+Important: Please run exact commands, and read the response from the terminal.
+If any error happens, copy-paste the full terminal output.
+
+sudo apt update
+
+sudo apt install -y build-essential cmake pkg-config python3-dev \
+  libprotobuf-dev protobuf-compiler libgoogle-glog-dev \
+  libgflags-dev libeigen3-dev
+
+sudo apt install python3-opencv
+
+python3 -m venv myenv --system-site-packages
+
+source myenv/bin/activate
+
+This will make (myenv) in the head.
+
+```
+me400@raspberrypi:~ $ source myenv/bin/activate
+(myenv) me400@raspberrypi:~ $ 
+```
+
+Inside venv... (While (myenv) exists in the left)
+
+python -m pip install "torch==2.3.1"
+
+python -m pip install "torchvision==0.18.1"
+
+python -c "import torch, torchvision; print(torch.__version__, torchvision.__version__)" << validate the installation
+
+python -m pip install ultralytics --no-deps
+
+python -c "from ultralytics import YOLO; model = YOLO('yolov8n.pt'); print('OK')"
+
+sudo apt remove python3-simplejpeg -> Removes python3-picamera2...
+
+pip install simplejpeg
+
+pip install picamera2
+
+=== yolo-picam2.py works, latency ~ 1sec ===
+
+pip install ncnn

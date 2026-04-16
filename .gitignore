@@ -1,0 +1,51 @@
+# Virtual environments
+venv/
+env/
+label_env/
+new_env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# PyTorch / ML artifacts
+*.pt
+*.pth
+models/
+train/runs/
+
+# Dataset and media (large binaries)
+data/dataset/
+data/extracted_frames/
+data/videos/
+data/test/
+
+# Cache and logs
+*.cache
+*.log
+
+# Archives and large files
+*.zip
+*.tar
+*.tar.gz
+
+# Video files
+*.mp4
+*.avi
+*.mov
+
+# Editor/IDE
+.vscode/
+.idea/
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Misc
+*.so
