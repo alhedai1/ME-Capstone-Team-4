@@ -1,23 +1,23 @@
 #!/usr/bin/env python3
 """
-pole_tracker_pi.py
+pole_track_cv_usb.py
 
-Detect and track a black vertical pole outdoors using OpenCV on a Raspberry Pi 4.
+Detect and track a black vertical pole outdoors using OpenCV with a USB camera.
 
 Features:
-- Uses Picamera2 when available, otherwise falls back to OpenCV VideoCapture.
+- Uses OpenCV VideoCapture with a USB camera device or index.
 - Detects dark/black vertical objects by combining HSV (low V) and grayscale thresholds.
 - Filters contours by area and aspect ratio to prefer tall thin poles.
 - Simple exponential smoothing for centroid to reduce jitter.
 - Optional serial output (simple single-character commands) for robot control.
 
 Usage examples:
-    python3 pole_tracker_pi.py --display --serial /dev/ttyACM0 --baud 115200
-    python3 pole_tracker_pi.py --display
+    python3 pole_track_cv_usb.py --display --serial /dev/ttyACM0 --baud 115200
+    python3 pole_track_cv_usb.py --display --camera 0
+    python3 pole_track_cv_usb.py --display --camera /dev/video0 --backend v4l2
 
 Dependencies:
     pip install opencv-python numpy pyserial
-    (optional) pip install picamera2
 
 Notes / tuning:
  - Outdoors, lighting varies: tune --v-thresh and --gray-thresh.
@@ -28,18 +28,9 @@ Notes / tuning:
 import argparse
 import time
 import sys
-import math
-import collections
 
 import numpy as np
 import cv2
-
-try:
-    # Picamera2 (newer Raspberry Pi OS). Optional.
-    from picamera2 import Picamera2
-    PICAMERA2_AVAILABLE = True
-except Exception:
-    PICAMERA2_AVAILABLE = False
 
 try:
     import serial
@@ -49,58 +40,48 @@ except Exception:
 
 
 class CameraSource:
-    """Camera wrapper that yields BGR frames. Tries Picamera2, falls back to OpenCV VideoCapture."""
+    """USB camera wrapper that yields BGR frames via OpenCV VideoCapture."""
 
-    def __init__(self, width=640, height=480, camera_index=0):
+    def __init__(self, width=640, height=480, camera=0, backend="auto"):
         self.width = int(width)
         self.height = int(height)
-        self.camera_index = camera_index
+        self.camera = self._normalize_camera(camera)
+        self.backend = self._resolve_backend(backend)
         self.cap = None
-        self.picam2 = None
+
+    @staticmethod
+    def _normalize_camera(camera):
+        if isinstance(camera, str):
+            camera = camera.strip()
+            if camera.isdigit():
+                return int(camera)
+        return camera
+
+    @staticmethod
+    def _resolve_backend(backend):
+        backend = backend.lower()
+        backend_map = {
+            "auto": cv2.CAP_ANY,
+            "v4l2": getattr(cv2, "CAP_V4L2", cv2.CAP_ANY),
+            "gstreamer": getattr(cv2, "CAP_GSTREAMER", cv2.CAP_ANY),
+            "ffmpeg": getattr(cv2, "CAP_FFMPEG", cv2.CAP_ANY),
+        }
+        if backend not in backend_map:
+            raise ValueError(f"Unsupported backend '{backend}'. Use one of: {', '.join(backend_map)}")
+        return backend_map[backend]
 
     def open(self):
-        if PICAMERA2_AVAILABLE:
-            try:
-                self.picam2 = Picamera2()
-                # Use a simple preview configuration; API may vary between picamera2 versions.
-                try:
-                    cfg = self.picam2.create_preview_configuration({"main": {"size": (self.width, self.height)}})
-                    self.picam2.configure(cfg)
-                except Exception:
-                    # fallback simple configure
-                    self.picam2.configure(self.picam2.create_preview_configuration())
-                self.picam2.start()
-                time.sleep(0.2)
-                print("Using Picamera2 for capture")
-                return
-            except Exception as e:
-                print("Picamera2 available but failed to open, falling back to VideoCapture:", e)
-
-        # Fallback to OpenCV VideoCapture
-        self.cap = cv2.VideoCapture(self.camera_index)
+        self.cap = cv2.VideoCapture(self.camera, self.backend)
         if not self.cap.isOpened():
-            raise RuntimeError(f"Could not open camera index {self.camera_index}")
-        # try to set resolution
+            raise RuntimeError(f"Could not open USB camera {self.camera!r}")
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
-        print("Using OpenCV VideoCapture for capture")
+        print(f"Using USB camera {self.camera!r} with OpenCV VideoCapture")
 
     def read(self):
-        if self.picam2 is not None:
-            # capture_array returns RGB image
-            arr = self.picam2.capture_array()
-            # Convert RGB to BGR for OpenCV
-            frame = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
-            return True, frame
-        else:
-            return self.cap.read()
+        return self.cap.read()
 
     def release(self):
-        if self.picam2 is not None:
-            try:
-                self.picam2.stop()
-            except Exception:
-                pass
         if self.cap is not None:
             try:
                 self.cap.release()
@@ -185,7 +166,7 @@ def make_command_from_detection(detection, frame_width, x_tol=0.08, forward_area
 
 
 def run(args):
-    cam = CameraSource(width=args.width, height=args.height, camera_index=args.camera)
+    cam = CameraSource(width=args.width, height=args.height, camera=args.camera, backend=args.backend)
     cam.open()
 
     ser = None
@@ -289,10 +270,12 @@ def run(args):
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Pole tracker for Raspberry Pi with PiCamera and OpenCV")
+    p = argparse.ArgumentParser(description="Pole tracker for a USB camera with OpenCV")
     p.add_argument('--width', type=int, default=640, help='capture width')
     p.add_argument('--height', type=int, default=480, help='capture height')
-    p.add_argument('--camera', type=int, default=0, help='OpenCV camera index (if not using Picamera2)')
+    p.add_argument('--camera', type=str, default='0', help='USB camera index or device path (for example: 0 or /dev/video0)')
+    p.add_argument('--backend', type=str, default='auto', choices=['auto', 'v4l2', 'gstreamer', 'ffmpeg'],
+                   help='OpenCV capture backend for the USB camera')
     p.add_argument('--display', action='store_true', help='show annotated display windows')
     p.add_argument('--serial', type=str, default=None, help='serial port to send commands to (e.g. /dev/ttyACM0)')
     p.add_argument('--baud', type=int, default=115200, help='baud for serial')
