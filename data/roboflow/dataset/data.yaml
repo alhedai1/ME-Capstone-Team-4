@@ -1,5 +1,5 @@
-train: /home/ahmed/Other/capstone/data/roboflow/dataset/images/train
-val: /home/ahmed/Other/capstone/data/roboflow/dataset/images/val
+train: images/train
+val: images/val
 
 nc: 2
 names: ['bell', 'pole']

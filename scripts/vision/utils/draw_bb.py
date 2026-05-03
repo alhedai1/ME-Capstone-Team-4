@@ -1,15 +1,18 @@
 import cv2
+import argparse
 from pathlib import Path
-
-# ====== CONFIG ======
-images_dir = Path("/home/ahmed/Other/capstone/data/roboflow/dataset/images/train")
-labels_dir = Path("/home/ahmed/Other/capstone/data/roboflow/dataset/labels/train")
 
 class_names = {
     0: "bell",
     1: "pole",
 }
-# ====================
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Display YOLO labels over images")
+    parser.add_argument("--images-dir", type=Path, default=Path("data/roboflow/dataset/images/train"))
+    parser.add_argument("--labels-dir", type=Path, default=Path("data/roboflow/dataset/labels/train"))
+    return parser.parse_args()
 
 
 def load_yolo_labels(label_path, img_w, img_h):
@@ -43,10 +46,11 @@ def load_yolo_labels(label_path, img_w, img_h):
 
 
 def main():
+    args = parse_args()
     image_extensions = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 
     image_paths = sorted(
-        [p for p in images_dir.iterdir() if p.is_file() and p.suffix.lower() in image_extensions]
+        [p for p in args.images_dir.iterdir() if p.is_file() and p.suffix.lower() in image_extensions]
     )
 
     if not image_paths:
@@ -54,7 +58,7 @@ def main():
         return
 
     for image_path in image_paths:
-        label_path = labels_dir / f"{image_path.stem}.txt"
+        label_path = args.labels_dir / f"{image_path.stem}.txt"
 
         img = cv2.imread(str(image_path))
         if img is None:

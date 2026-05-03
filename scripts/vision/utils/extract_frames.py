@@ -1,39 +1,45 @@
+#!/usr/bin/env python3
+import argparse
+from pathlib import Path
+
 import cv2
-import os
 
-video_folder = "/home/ahmed/Other/capstone/data/videos"
-output_folder = "/home/ahmed/Other/capstone/data/extracted_frames/phone2"
 
-os.makedirs(output_folder, exist_ok=True)
+def parse_args():
+    parser = argparse.ArgumentParser(description="Extract frames from a video file")
+    parser.add_argument("video", type=Path, help="input video path")
+    parser.add_argument("--output-dir", type=Path, default=Path("data/extracted_frames"))
+    parser.add_argument("--frame-skip", type=int, default=15)
+    return parser.parse_args()
 
-frame_skip = 15
-saved_count = 0
 
-# video_file = "20260403_172554.mp4"
-video_file = "20260403_172712.mp4"
+def main():
+    args = parse_args()
+    if args.frame_skip <= 0:
+        raise SystemExit("--frame-skip must be positive")
 
-# for video_file in os.listdir(video_folder):
-video_path = os.path.join(video_folder, video_file)
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    cap = cv2.VideoCapture(str(args.video))
+    if not cap.isOpened():
+        raise SystemExit(f"Could not open video: {args.video}")
 
-cap = cv2.VideoCapture(video_path)
+    frame_count = 0
+    saved_count = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-frame_count = 0
+        if frame_count % args.frame_skip == 0:
+            filename = f"{args.video.stem}_{saved_count:05d}.jpg"
+            cv2.imwrite(str(args.output_dir / filename), frame)
+            saved_count += 1
 
-while True:
-    ret, frame = cap.read()
+        frame_count += 1
 
-    if not ret:
-        break
+    cap.release()
+    print(f"Saved {saved_count} images to {args.output_dir}")
 
-    if frame_count % frame_skip == 0:
-        filename = f"{os.path.splitext(video_file)[0]}_{saved_count:05d}.jpg"
-        save_path = os.path.join(output_folder, filename)
 
-        cv2.imwrite(save_path, frame)
-        saved_count += 1
-
-    frame_count += 1
-
-cap.release()
-
-print(f"Saved {saved_count} images")
+if __name__ == "__main__":
+    main()

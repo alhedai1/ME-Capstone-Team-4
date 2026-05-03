@@ -1,3 +1,4 @@
+import argparse
 import json
 from pathlib import Path
 
@@ -41,8 +42,19 @@ def convert_folder(folder_path, output_dir=None):
     for json_file in folder.glob("*.json"):
         convert_roboflow_json_to_yolo(json_file, output_dir)
 
-# Example usage:
-# convert_roboflow_json_to_yolo("20260403_172554_00000.json")
-# convert_folder("./roboflow_jsons", "./labels")
+def parse_args():
+    parser = argparse.ArgumentParser(description="Convert Roboflow JSON labels to YOLO txt labels")
+    parser.add_argument("input", type=Path, help="JSON file or folder of JSON files")
+    parser.add_argument("--output-dir", type=Path, default=None)
+    return parser.parse_args()
 
-convert_folder("/home/ahmed/Other/capstone/data/roboflow/labels_json", "/home/ahmed/Other/capstone/data/roboflow/labels")
+
+def main():
+    args = parse_args()
+    if args.input.is_dir():
+        convert_folder(args.input, args.output_dir)
+    else:
+        convert_roboflow_json_to_yolo(args.input, args.output_dir)
+
+if __name__ == "__main__":
+    main()

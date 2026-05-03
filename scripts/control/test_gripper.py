@@ -1,4 +1,4 @@
-from gpiozero import Robot, Motor
+from gpiozero import Motor
 from time import sleep
 
 import argparse
@@ -11,38 +11,34 @@ import argparse
 
 motor = Motor(23, 24, pwm=True)
 
-def test_climb():
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run a short gripper motor test")
+    parser.add_argument("--armed", action="store_true", help="required to move the motor")
+    parser.add_argument("--speed", type=float, default=0.25, help="motor speed from 0.0 to 1.0")
+    parser.add_argument("--duration", type=float, default=1.0, help="test duration in seconds")
+    return parser.parse_args()
+
+
+def test_climb(speed, duration):
+    if not 0.0 <= speed <= 1.0:
+        raise ValueError("--speed must be between 0.0 and 1.0")
+    if duration <= 0:
+        raise ValueError("--duration must be positive")
+
     try:
         print("--- Gripper Pole Climber Test Start ---")
-        
-        # 1. Low Power Grip Test
-        print("Testing grip: 30% power...")
-        motor.forward(1)
-        sleep(10)
-        
-        # 2. Stop and Hold
-        # print("Testing hold: Stopping motors...")
-        # motor.stop()
-        # sleep(3)
-        
-        # # 3. High Power Climb
-        # print("Testing climb: 70% power...")
-        # motor.forward(0.7)
-        # sleep(4)
-        
-        # # 4. Descent
-        # print("Testing descent: 10% power...")
-        # motor.backward(0.1)
-        # sleep(3)
-        
-        motor.stop()
+        print(f"Running forward at {speed:.0%} power for {duration:.1f}s")
+        motor.forward(speed)
+        sleep(duration)
         print("Test sequence complete.")
 
     except KeyboardInterrupt:
-        motor.stop()
         print("\nEmergency Stop triggered.")
+    finally:
+        motor.stop()
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    # p.add_argument('--')
-    test_climb()
+    args = parse_args()
+    if not args.armed:
+        raise SystemExit("Refusing to move motor. Re-run with --armed when the robot is secured.")
+    test_climb(args.speed, args.duration)

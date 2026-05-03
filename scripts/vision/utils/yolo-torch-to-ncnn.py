@@ -1,16 +1,24 @@
+#!/usr/bin/env python3
+import argparse
+from pathlib import Path
+
 from ultralytics import YOLO
 
-# Load a YOLO26n PyTorch model
-model = YOLO("/home/ahmed/Other/capstone/train/runs/detect/yolo26n_sz320/weights/best.pt")
 
-# Export the model to NCNN format
-# exported_model_path = model.export(format="ncnn", half=True, )  # creates 'yolo26n_ncnn_model'
-exported_model_path = model.export(format="ncnn", half=True, imgsz=320)  # smaller size
+def parse_args():
+    parser = argparse.ArgumentParser(description="Export a YOLO PyTorch model to NCNN")
+    parser.add_argument("--model", type=Path, default=Path("train/runs/detect/yolo26n_sz320/weights/best.pt"))
+    parser.add_argument("--imgsz", type=int, default=320)
+    parser.add_argument("--half", action="store_true")
+    return parser.parse_args()
 
-print(exported_model_path)
 
-# Load the exported NCNN model
-# ncnn_model = YOLO("best_ncnn_model")
+def main():
+    args = parse_args()
+    model = YOLO(str(args.model))
+    exported_model_path = model.export(format="ncnn", half=args.half, imgsz=args.imgsz)
+    print(exported_model_path)
 
-# Run inference
-# results = ncnn_model("https://ultralytics.com/images/bus.jpg")
+
+if __name__ == "__main__":
+    main()

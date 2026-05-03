@@ -10,42 +10,34 @@ import argparse
 robot = Robot(left=(27, 17), right=(23, 24))
 # physical pins: left =(16,18), right=(13,11)
 
-def test_climb():
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run a short magnetic wheel drive test")
+    parser.add_argument("--armed", action="store_true", help="required to move the motors")
+    parser.add_argument("--speed", type=float, default=0.25, help="motor speed from 0.0 to 1.0")
+    parser.add_argument("--duration", type=float, default=1.0, help="test duration in seconds")
+    return parser.parse_args()
+
+
+def test_climb(speed, duration):
+    if not 0.0 <= speed <= 1.0:
+        raise ValueError("--speed must be between 0.0 and 1.0")
+    if duration <= 0:
+        raise ValueError("--duration must be positive")
+
     try:
         print("--- Magnet Pole Climber Test Start ---")
-        
-        # 1. Low Power Grip Test
-        # Seeing if the magnets hold while the motor provides just a little lift
-        print("Testing grip: 10% power...")
-        robot.forward(1)
-        sleep(2)
-        
-        # 2. Stop and Hold
-        # Does the robot slide down when power is cut? 
-        # (Depends on gear ratio and magnet strength)
-        # print("Testing hold: Stopping motors...")
-        # robot.stop()
-        # sleep(3)
-        
-        # 3. High Power Climb
-        # print("Testing climb: 70% power...")
-        # robot.forward(0.7)
-        # sleep(4)
-        
-        # 4. Descent
-        # Be careful here; gravity + motor speed can make it come down fast!
-        # print("Testing descent: 10% power...")
-        # robot.backward(0.1)
-        # sleep(3)
-        
-        robot.stop()
+        print(f"Running forward at {speed:.0%} power for {duration:.1f}s")
+        robot.forward(speed)
+        sleep(duration)
         print("Test sequence complete.")
 
     except KeyboardInterrupt:
-        robot.stop()
         print("\nEmergency Stop triggered.")
+    finally:
+        robot.stop()
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser()
-    # p.add_argument('--')
-    test_climb()
+    args = parse_args()
+    if not args.armed:
+        raise SystemExit("Refusing to move motors. Re-run with --armed when the robot is secured.")
+    test_climb(args.speed, args.duration)

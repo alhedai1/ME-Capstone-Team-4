@@ -13,6 +13,11 @@ __pycache__/
 dist/
 build/
 
+# ROS2 build outputs
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
 # PyTorch / ML artifacts
 *.pt
 *.pth
@@ -22,12 +27,15 @@ train/runs/
 # Dataset and media (large binaries)
 data/dataset/
 data/extracted_frames/
+data/roboflow/
 data/videos/
 data/test/
+data/roboflow
 
 # Cache and logs
 *.cache
 *.log
+*.jsonl
 
 # Archives and large files
 *.zip
@@ -43,6 +51,12 @@ data/test/
 .vscode/
 .idea/
 .DS_Store
+*.swp
+
+# Local config / secrets
+.env
+.env.*
+!.env.example
 
 # Jupyter
 .ipynb_checkpoints/
