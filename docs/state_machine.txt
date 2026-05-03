@@ -1,0 +1,27 @@
+SEARCH_TOP_STRUCTURE
+    rotate slowly until normal Pi camera sees pole and rod/bell
+
+COARSE_ALIGN
+    use normal Pi camera
+    reduce x_bell_or_rod - x_pole
+
+APPROACH_POLE
+    center pole
+    drive forward slowly
+
+NEAR_POLE_FINE_ALIGN
+    use upward AI camera
+    detect rod angle
+    rotate until rod angle matches reference angle
+
+ATTACH
+    drive into pole / engage magnetic wheels
+
+CLIMB
+    climb using motor encoders or timed climbing
+
+DETECT_BELL_TOP
+    use AI camera after robot has rotated 90 degrees
+
+STRIKE
+    actuate striker
