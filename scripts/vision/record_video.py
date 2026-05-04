@@ -57,7 +57,7 @@ class PiCamera:
         frame = self.picam2.capture_array()
         if frame is None:
             return False, None
-        return True, cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        return True, frame
 
     def release(self):
         self.picam2.stop()
