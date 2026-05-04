@@ -7,10 +7,17 @@ import threading
 
 import cv2
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Record video from the Raspberry Pi Camera")
-    parser.add_argument("--output", type=Path, default=Path("data/test_videos/recording.mp4"))
+    # parser.add_argument("--output", type=Path, default=Path("data/test_videos/recording.mp4"))
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=REPO_ROOT / "data/test_videos/recording.mp4",
+    )
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--fps", type=float, default=30)
