@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
 import argparse
 from datetime import datetime
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import threading
 
 import cv2
 
 
-def parse_source(value):
-    if value.lower() in {"picamera", "picam", "pi"}:
-        return "picamera"
-    return int(value) if value.isdigit() else value
-
-
 def parse_args():
-    parser = argparse.ArgumentParser(description="Record video from an OpenCV camera source")
-    parser.add_argument("--source", default="picamera", help="camera index or video source")
+    parser = argparse.ArgumentParser(description="Record video from the Raspberry Pi Camera")
     parser.add_argument("--output", type=Path, default=Path("data/test_videos/recording.mp4"))
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--fps", type=float, default=30)
     parser.add_argument("--rotate", choices=["none", "cw", "ccw", "180"], default="none")
     parser.add_argument("--show", action="store_true", help="show preview window")
+    parser.add_argument("--preview-port", type=int, default=None, help="serve browser preview on this port")
+    parser.add_argument("--preview-host", default="0.0.0.0", help="host/interface for browser preview")
+    parser.add_argument("--preview-width", type=int, default=640, help="browser preview width")
     return parser.parse_args()
 
 
@@ -38,23 +36,6 @@ def writer_size(width, height, rotation):
     if rotation in {"cw", "ccw"}:
         return height, width
     return width, height
-
-
-class OpenCVCamera:
-    def __init__(self, source, width, height, fps):
-        self.cap = cv2.VideoCapture(source)
-        if not self.cap.isOpened():
-            raise RuntimeError(f"Could not open video source: {source}")
-
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
-        self.cap.set(cv2.CAP_PROP_FPS, fps)
-
-    def read(self):
-        return self.cap.read()
-
-    def release(self):
-        self.cap.release()
 
 
 class PiCamera:
@@ -82,12 +63,6 @@ class PiCamera:
         self.picam2.stop()
 
 
-def open_camera(source, width, height, fps):
-    if source == "picamera":
-        return PiCamera(width, height, fps)
-    return OpenCVCamera(source, width, height, fps)
-
-
 def draw_overlay(frame, frame_number):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     text = f"{timestamp}  frame={frame_number}"
@@ -103,12 +78,94 @@ def draw_overlay(frame, frame_number):
     )
 
 
+class MjpegPreview:
+    def __init__(self, host, port):
+        self.frame = None
+        self.condition = threading.Condition()
+
+        preview = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path in {"/", "/index.html"}:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html")
+                    self.end_headers()
+                    self.wfile.write(
+                        b"<html><body><img src='/stream' style='max-width:100%;'></body></html>"
+                    )
+                    return
+
+                if self.path != "/stream":
+                    self.send_error(404)
+                    return
+
+                self.send_response(200)
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+                self.end_headers()
+
+                while True:
+                    with preview.condition:
+                        preview.condition.wait(timeout=1.0)
+                        jpg = preview.frame
+
+                    if jpg is None:
+                        continue
+
+                    try:
+                        self.wfile.write(b"--frame\r\n")
+                        self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                        self.wfile.write(f"Content-Length: {len(jpg)}\r\n\r\n".encode("ascii"))
+                        self.wfile.write(jpg)
+                        self.wfile.write(b"\r\n")
+                    except (BrokenPipeError, ConnectionResetError):
+                        break
+
+            def log_message(self, format, *args):
+                return
+
+        self.httpd = ThreadingHTTPServer((host, port), Handler)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+
+    @property
+    def address(self):
+        host, port = self.httpd.server_address
+        return host, port
+
+    def start(self):
+        self.thread.start()
+
+    def update(self, frame):
+        ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        if not ok:
+            return
+
+        with self.condition:
+            self.frame = encoded.tobytes()
+            self.condition.notify_all()
+
+    def stop(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+def make_preview_frame(frame, frame_number, preview_width):
+    preview = frame.copy()
+    if preview_width > 0 and preview.shape[1] != preview_width:
+        scale = preview_width / preview.shape[1]
+        preview_height = int(preview.shape[0] * scale)
+        preview = cv2.resize(preview, (preview_width, preview_height))
+    draw_overlay(preview, frame_number)
+    return preview
+
+
 def main():
     args = parse_args()
-    source = parse_source(str(args.source))
 
     try:
-        camera = open_camera(source, args.width, args.height, args.fps)
+        camera = PiCamera(args.width, args.height, args.fps)
     except RuntimeError as exc:
         raise SystemExit(str(exc))
 
@@ -119,6 +176,14 @@ def main():
     if not writer.isOpened():
         camera.release()
         raise SystemExit(f"Could not open output video for writing: {args.output}")
+
+    preview_server = None
+    if args.preview_port is not None:
+        preview_server = MjpegPreview(args.preview_host, args.preview_port)
+        preview_server.start()
+        host, port = preview_server.address
+        display_host = "localhost" if host == "0.0.0.0" else host
+        print(f"Preview stream: http://{display_host}:{port}")
 
     frame_number = 0
     try:
@@ -132,9 +197,13 @@ def main():
             frame = rotate_frame(frame, args.rotate)
             writer.write(frame)
 
+            if args.show or preview_server is not None:
+                preview = make_preview_frame(frame, frame_number, args.preview_width)
+
+            if preview_server is not None:
+                preview_server.update(preview)
+
             if args.show:
-                preview = frame.copy()
-                draw_overlay(preview, frame_number)
                 cv2.imshow("record_video", preview)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
@@ -146,6 +215,8 @@ def main():
     finally:
         writer.release()
         camera.release()
+        if preview_server is not None:
+            preview_server.stop()
         if args.show:
             cv2.destroyAllWindows()
 
