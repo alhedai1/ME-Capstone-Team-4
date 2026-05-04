@@ -1,0 +1,30 @@
+hostname: team4
+user: team4
+pwd: team4
+
+to access from terminal
+1. ethernet: ssh team4@10.42.0.166
+2. wifi: ssh team4@210.107.135.126
+
+
+
+how to get wifi working:
+connect rpi to laptop with ethernet (& set wifi/ethernet sharing)
+arp -a to see list of ips -> find rpi ip (eno1)
+ssh user@ip
+set up wifi (use sudo):
+nmcli connection add type wifi con-name kaist ifname wlan0 ssid "SSID_NAME"
+nmcli connection modify kaist wifi-sec.key-mgmt wpa-eap 802-1x.eap peap 802-1x.identity "YOUR_ID" 802-1x.password "YOUR_PASSWORD" 802-1x.phase2-auth mschapv2
+nmcli connection up kaist
+hostname -I to get wifi ip
+unplug ethernet and ssh using wifi ip
+
+setup to avoid entering ip everytime (not sure if this is needed, try sshing with hostname instead of ip first):
+on laptop:
+sudo apt install avahi-daemon libnss-mdns
+sudo systemctl enable --now avahi-daemon
+on pi:
+sudo apt install avahi-daemon
+sudo systemctl enable --now avahi-daemon
+on laptop:
+ssh user@hostname.local
