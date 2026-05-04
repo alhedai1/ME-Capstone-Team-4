@@ -9,3 +9,7 @@ Ideas for aligning pole-bell-robot before approaching:
     align so that rod is vertical in AI cam frame
     approach pole & climb
 3. combine the 2
+
+
+Questions:
+1. can i use phone camera to capture videos for training & testing alignment?
