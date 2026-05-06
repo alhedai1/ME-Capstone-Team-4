@@ -8,25 +8,44 @@ import threading
 import cv2
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "data/test_videos"
+DEFAULT_OUTPUT = DEFAULT_OUTPUT_DIR / "recording.mp4"
+
+
+def output_path_from_name(name):
+    output = Path(name)
+    if output.suffix == "":
+        output = output.with_suffix(".mp4")
+    if output.parent == Path("."):
+        output = DEFAULT_OUTPUT_DIR / output
+    return output
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Record video from the Raspberry Pi Camera")
-    # parser.add_argument("--output", type=Path, default=Path("data/test_videos/recording.mp4"))
+    parser.add_argument(
+        "name",
+        nargs="?",
+        help="output filename saved under data/test_videos; .mp4 is added if omitted",
+    )
     parser.add_argument(
         "--output",
         type=Path,
-        default=REPO_ROOT / "data/test_videos/recording.mp4",
+        default=None,
+        help="full output video path; overrides positional filename",
     )
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--fps", type=float, default=30)
     parser.add_argument("--rotate", choices=["none", "cw", "ccw", "180"], default="none")
     parser.add_argument("--show", action="store_true", help="show preview window")
-    parser.add_argument("--preview-port", type=int, default=None, help="serve browser preview on this port")
+    parser.add_argument("--preview-port", type=int, default=1234, help="serve browser preview on this port")
     parser.add_argument("--preview-host", default="0.0.0.0", help="host/interface for browser preview")
     parser.add_argument("--preview-width", type=int, default=640, help="browser preview width")
-    return parser.parse_args()
+    args = parser.parse_args()
+    if args.output is None:
+        args.output = output_path_from_name(args.name) if args.name else DEFAULT_OUTPUT
+    return args
 
 
 def rotate_frame(frame, rotation):
