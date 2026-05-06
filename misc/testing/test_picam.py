@@ -6,7 +6,7 @@ picam2 = Picamera2()
 
 config = picam2.create_video_configuration(
     main={"size": (320, 240), "format": "RGB888"},
-    controls={"FrameRate": 60.0},
+    controls={"FrameRate": 30.0},
     buffer_count=1,
 )
 
