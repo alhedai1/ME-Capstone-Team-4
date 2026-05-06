@@ -12,5 +12,7 @@ PURCHASE LIST
     coupang: https://www.coupang.com/vp/products/7214833578?itemId=18268081871&vendorItemId=92158957462&q=%EC%9E%90%EB%8F%99%EC%B0%A8+%ED%93%A8%EC%A6%88%ED%99%80%EB%8D%94+287+AUTO+%2F+ATO+%EC%A0%84%EC%9A%A9+%EB%B0%A9%EC%88%98&searchId=6567adbf666518&sourceType=search&itemsCount=36&searchRank=0&rank=0&traceId=mott8ku6
 6. lipo alarm (https://www.devicemart.co.kr/goods/view?no=1346048)
     coupang: https://www.coupang.com/vp/products/191088909?itemId=546125899&vendorItemId=71127634781&q=C66+LIPO+%EB%A6%AC%ED%8F%AC%EC%95%8C%EB%9E%8C+%EB%A6%AC%ED%8A%AC%ED%8F%B4%EB%A6%AC%EB%A8%B8+%EB%B0%B0%ED%84%B0%EB%A6%AC+%EC%A0%84%EC%95%95+%EC%B8%A1%EC%A0%95%EA%B8%B0&searchId=963b42ff100010&sourceType=search&itemsCount=36&searchRank=2&rank=2&traceId=mottarwj
+
 7. 
 
+Global Shutter Camera (task 2) (https://www.devicemart.co.kr/goods/view?no=15784210)
