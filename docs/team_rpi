@@ -1,6 +1,7 @@
 hostname: team4
 user: team4
 pwd: team4
+tailscale ip: 100.95.60.76
 
 to access from terminal
 1. ethernet: ssh team4@10.42.0.166
