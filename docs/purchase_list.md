@@ -7,4 +7,5 @@ PURCHASE LIST
 5. fuse holder (https://www.devicemart.co.kr/goods/view?no=4535)
     OR: blade fuse holder(https://www.devicemart.co.kr/goods/view?no=12170196)
 6. lipo alarm (https://www.devicemart.co.kr/goods/view?no=1346048)
-7. 
+
+7. Global Shutter Camera (task 2) (https://www.devicemart.co.kr/goods/view?no=15784210)

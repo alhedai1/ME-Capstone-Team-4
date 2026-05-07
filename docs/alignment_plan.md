@@ -10,6 +10,9 @@ Ideas for aligning pole-bell-robot before approaching:
     approach pole & climb
 3. combine the 2
 
+try using opencv (no yolo) for approaching pole (after alignment)
 
 Questions:
 1. can i use phone camera to capture videos for training & testing alignment?
+    crop or adjust zoom
+    de-enhance
