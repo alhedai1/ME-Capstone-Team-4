@@ -2,7 +2,7 @@ from ultralytics import YOLO
 
 
 def main():
-    model = YOLO("yolo26n.pt")
+    model = YOLO("yolo11n.pt")
 
     model.train(
         data="data/dataset/data.yaml",
@@ -10,7 +10,7 @@ def main():
         imgsz=640,
         batch=-1,
         project="runs/pole",
-        name="yolo26n_640",
+        name="yolo11n_640",
         pretrained=True,
     )
 
