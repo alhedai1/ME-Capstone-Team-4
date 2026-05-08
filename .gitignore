@@ -31,6 +31,7 @@ data/roboflow/
 data/videos/
 data/test/
 data/roboflow
+data_old/
 
 # Cache and logs
 *.cache

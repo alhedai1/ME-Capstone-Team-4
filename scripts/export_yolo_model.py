@@ -6,7 +6,7 @@ from ultralytics import YOLO
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL = REPO_ROOT / "runs/detect/runs/pole/yolo26n_640/weights/best.pt"
+DEFAULT_MODEL = REPO_ROOT / "models/yolo11n_640/weights/best.pt"
 DEFAULT_DATA = REPO_ROOT / "data/dataset/data.yaml"
 
 
