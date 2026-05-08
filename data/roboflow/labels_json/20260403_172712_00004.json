@@ -1,1 +1,0 @@
-{"predictions": {"image": {"width": 720, "height": 1280}, "predictions": [{"width": 135.89633178710938, "height": 685.4778289794922, "x": 444.3922882080078, "y": 343.77994537353516, "confidence": 0.9214484691619873, "class_id": 1, "class": "pole", "detection_id": "fdf5ace8-fb4e-4afc-8929-60a1ccf0120e", "parent_id": "image"}]}, "visualization": "<deducted_image>"}

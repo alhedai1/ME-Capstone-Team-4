@@ -47,6 +47,10 @@ data/roboflow
 *.avi
 *.mov
 
+# Image files
+*.png
+*.jpg
+
 # Editor/IDE
 .vscode/
 .idea/
