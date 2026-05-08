@@ -7,6 +7,8 @@ tests, verify motor directions with low power, then tune the thresholds outdoors
 """
 
 import argparse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import threading
 import time
 from pathlib import Path
 
@@ -31,6 +33,9 @@ def parse_args():
     parser.add_argument("--imgsz", type=int, default=640, help="YOLO inference image size")
     parser.add_argument("--conf", type=float, default=0.5, help="YOLO confidence threshold")
     parser.add_argument("--show", action="store_true", help="show local OpenCV preview")
+    parser.add_argument("--preview-port", type=int, default=1234, help="serve browser preview on this port; use 0 to disable")
+    parser.add_argument("--preview-host", default="0.0.0.0", help="host/interface for browser preview")
+    parser.add_argument("--preview-width", type=int, default=640, help="browser preview width")
     parser.add_argument("--armed", action="store_true", help="required before motor commands are sent")
     parser.add_argument("--serial-port", default="/dev/ttyACM0", help="Arduino serial port")
     parser.add_argument("--baud", type=int, default=115200, help="Arduino serial baud rate")
@@ -129,6 +134,79 @@ class MotorDriver:
         self.serial.flush()
 
 
+class MjpegPreview:
+    def __init__(self, host, port):
+        self.frame = None
+        self.condition = threading.Condition()
+
+        preview = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path in {"/", "/index.html"}:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/html")
+                    self.end_headers()
+                    self.wfile.write(
+                        b"<html><body><img src='/stream' style='max-width:100%;'></body></html>"
+                    )
+                    return
+
+                if self.path != "/stream":
+                    self.send_error(404)
+                    return
+
+                self.send_response(200)
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Pragma", "no-cache")
+                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+                self.end_headers()
+
+                while True:
+                    with preview.condition:
+                        preview.condition.wait(timeout=1.0)
+                        jpg = preview.frame
+
+                    if jpg is None:
+                        continue
+
+                    try:
+                        self.wfile.write(b"--frame\r\n")
+                        self.wfile.write(b"Content-Type: image/jpeg\r\n")
+                        self.wfile.write(f"Content-Length: {len(jpg)}\r\n\r\n".encode("ascii"))
+                        self.wfile.write(jpg)
+                        self.wfile.write(b"\r\n")
+                    except (BrokenPipeError, ConnectionResetError):
+                        break
+
+            def log_message(self, format, *args):
+                return
+
+        self.httpd = ThreadingHTTPServer((host, port), Handler)
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+
+    @property
+    def address(self):
+        host, port = self.httpd.server_address
+        return host, port
+
+    def start(self):
+        self.thread.start()
+
+    def update(self, frame):
+        ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        if not ok:
+            return
+
+        with self.condition:
+            self.frame = encoded.tobytes()
+            self.condition.notify_all()
+
+    def stop(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
 def center_x(box):
     x1, _, x2, _ = box
     return (x1 + x2) / 2.0
@@ -207,6 +285,15 @@ def draw_overlay(frame, pole, status, left, right, error_px):
     return annotated
 
 
+def resize_preview(frame, preview_width):
+    if preview_width <= 0 or frame.shape[1] == preview_width:
+        return frame
+
+    scale = preview_width / frame.shape[1]
+    preview_height = int(frame.shape[0] * scale)
+    return cv2.resize(frame, (preview_width, preview_height))
+
+
 def main():
     args = parse_args()
 
@@ -228,6 +315,14 @@ def main():
     detected_frames = 0
     lost_frames = 0
     start_time = time.monotonic()
+
+    preview_server = None
+    if args.preview_port > 0:
+        preview_server = MjpegPreview(args.preview_host, args.preview_port)
+        preview_server.start()
+        host, port = preview_server.address
+        display_host = "localhost" if host == "0.0.0.0" else host
+        print(f"Preview stream: http://{display_host}:{port}")
 
     try:
         while True:
@@ -271,6 +366,8 @@ def main():
                     status = f"NEAR POLE - STOP area={area_ratio:.2f} height={height_ratio:.2f}"
                     motors.stop()
                     annotated = draw_overlay(frame, pole, status, left, right, error_px)
+                    if preview_server is not None:
+                        preview_server.update(resize_preview(annotated, args.preview_width))
                     if args.show:
                         cv2.imshow("approach_pole_yolo", annotated)
                         cv2.waitKey(500)
@@ -287,8 +384,13 @@ def main():
 
             print(f"{status} left={left:+.2f} right={right:+.2f}")
 
-            if args.show:
+            if args.show or preview_server is not None:
                 annotated = draw_overlay(frame, pole, status, left, right, error_px)
+
+            if preview_server is not None:
+                preview_server.update(resize_preview(annotated, args.preview_width))
+
+            if args.show:
                 cv2.imshow("approach_pole_yolo", annotated)
                 if cv2.waitKey(1) & 0xFF == ord("q"):
                     break
@@ -298,6 +400,8 @@ def main():
     finally:
         motors.close()
         camera.release()
+        if preview_server is not None:
+            preview_server.stop()
         if args.show:
             cv2.destroyAllWindows()
 
