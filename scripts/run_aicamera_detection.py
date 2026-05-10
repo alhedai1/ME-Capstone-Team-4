@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils import *
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_MODEL = REPO_ROOT / "models/pole_yolo11n.rpk"
+DEFAULT_MODEL = REPO_ROOT / "models/pole_imx/network.rpk"
 DEFAULT_LABELS = REPO_ROOT / "models/labels.txt"
 
 
