@@ -127,3 +127,37 @@ class MjpegPreview:
     def stop(self):
         self.httpd.shutdown()
         self.httpd.server_close()
+
+def resize_preview(frame, preview_width):
+    if preview_width <= 0 or frame.shape[1] == preview_width:
+        return frame
+
+    scale = preview_width / frame.shape[1]
+    preview_height = int(frame.shape[0] * scale)
+    return cv2.resize(frame, (preview_width, preview_height))
+
+def resolve_model_path(model_path):
+    if model_path.exists():
+        return model_path
+
+    candidates = sorted(
+        (REPO_ROOT / "runs").rglob("best.pt"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if candidates and model_path == DEFAULT_MODEL:
+        return candidates[0]
+
+    raise SystemExit(f"Model does not exist: {model_path}")
+
+def draw_status(frame, inference_fps, average_fps, frame_count):
+    cv2.putText(
+        frame,
+        f"infer FPS: {inference_fps:.1f}  avg FPS: {average_fps:.1f}  frame: {frame_count}",
+        (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        (0, 255, 0),
+        2,
+        cv2.LINE_AA,
+    )
