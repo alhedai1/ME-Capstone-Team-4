@@ -6,9 +6,10 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
+from capstone_robot.utils import *
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL = REPO_ROOT / "runs/detect/runs/pole/yolo26n_640/weights/best.pt"
+REPO_ROOT = find_repo_root(__file__)
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/train/runs/detect/runs/upward_2/yolo11n_upward_2_640/weights/best.pt"
 
 
 def parse_args():
@@ -112,6 +113,7 @@ def main():
                 writer.write(annotated)
 
             cv2.imshow(args.window_name, annotated)
+            cv2.waitKey(0)
             key = cv2.waitKey(1) & 0xFF
             if key == ord("q") or key == 27:
                 break

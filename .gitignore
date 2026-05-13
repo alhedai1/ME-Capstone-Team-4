@@ -25,13 +25,13 @@ models/
 train/runs/
 
 # Dataset and media (large binaries)
-data/dataset/
-data/extracted_frames/
-data/roboflow/
-data/videos/
-data/test/
-data/roboflow
-data_old/
+src/capstone_robot/data/datasets/
+src/capstone_robot/data/extracted_frames/
+src/capstone_robot/data/roboflow/
+src/capstone_robot/data/videos/
+src/capstone_robot/data/test/
+src/capstone_robot/data/roboflow
+src/capstone_robot/data_old/
 
 # Cache and logs
 *.cache
