@@ -15,9 +15,10 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
+from capstone_robot.utils import find_repo_root
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MODEL = REPO_ROOT / "runs/detect/runs/pole/yolo26n_640/weights/best_ncnn_model"
+REPO_ROOT = find_repo_root(__file__)
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole/yolo11n_640/weights/best_ncnn_model"
 
 
 def clamp(value, low, high):

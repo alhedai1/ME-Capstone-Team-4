@@ -19,12 +19,14 @@
 // ===== Left wheel / BTS7960 #1 =====
 const int LEFT_RPWM = 5;   // PWM-capable
 const int LEFT_LPWM = 6;   // PWM-capable
+// can just connect both EN pins to 5V
 const int LEFT_REN = 7;
 const int LEFT_LEN = 8;
 
 // ===== Right wheel / BTS7960 #2 =====
 const int RIGHT_RPWM = 9;   // PWM-capable
 const int RIGHT_LPWM = 10;  // PWM-capable
+// can just connect both EN pins to 5V
 const int RIGHT_REN = 11;
 const int RIGHT_LEN = 12;
 
@@ -166,9 +168,10 @@ void loop() {
     }
   }
 
-  if (!watchdogStopped && millis() - lastCommandMs > WATCHDOG_TIMEOUT_MS) {
-    stopMotors();
-    watchdogStopped = true;
-    Serial.println("WATCHDOG STOP");
-  }
+  // disable watchdog while testing
+  // if (!watchdogStopped && millis() - lastCommandMs > WATCHDOG_TIMEOUT_MS) {
+  //   stopMotors();
+  //   watchdogStopped = true;
+  //   Serial.println("WATCHDOG STOP");
+  // }
 }

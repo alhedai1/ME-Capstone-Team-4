@@ -127,3 +127,66 @@ class MjpegPreview:
     def stop(self):
         self.httpd.shutdown()
         self.httpd.server_close()
+
+def resize_preview(frame, preview_width):
+    if preview_width <= 0 or frame.shape[1] == preview_width:
+        return frame
+
+    scale = preview_width / frame.shape[1]
+    preview_height = int(frame.shape[0] * scale)
+    return cv2.resize(frame, (preview_width, preview_height))
+
+def resolve_model_path(model_path):
+    if model_path.exists():
+        return model_path
+
+    candidates = sorted(
+        (REPO_ROOT / "runs").rglob("best.pt"),
+        key=lambda path: path.stat().st_mtime,
+        reverse=True,
+    )
+    if candidates and model_path == DEFAULT_MODEL:
+        return candidates[0]
+
+    raise SystemExit(f"Model does not exist: {model_path}")
+
+def draw_status(frame, inference_fps, average_fps, frame_count):
+    cv2.putText(
+        frame,
+        f"infer FPS: {inference_fps:.1f}  avg FPS: {average_fps:.1f}  frame: {frame_count}",
+        (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        (0, 255, 0),
+        2,
+        cv2.LINE_AA,
+    )
+
+def get_detections(result, frame):
+    detections = []
+    if result.boxes is None:
+        return detections
+
+    names = result.names
+    for box in result.boxes:
+        cls_id = int(box.cls.item())
+        name = str(names.get(cls_id, cls_id)).lower()
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+        detections.append(
+            {
+                "class_id": cls_id,
+                "name": name,
+                "conf": float(box.conf.item()),
+                "box": clamp_box((x1, y1, x2, y2), frame.shape),
+            }
+        )
+    return detections
+
+def clamp_box(box, frame_shape):
+    height, width = frame_shape[:2]
+    x1, y1, x2, y2 = box
+    x1 = max(0, min(width - 1, int(round(x1))))
+    y1 = max(0, min(height - 1, int(round(y1))))
+    x2 = max(x1 + 1, min(width, int(round(x2))))
+    y2 = max(y1 + 1, min(height, int(round(y2))))
+    return (x1, y1, x2, y2)

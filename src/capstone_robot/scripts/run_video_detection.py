@@ -2,6 +2,7 @@
 import argparse
 import time
 from pathlib import Path
+import sys
 
 import cv2
 from ultralytics import YOLO
@@ -9,12 +10,13 @@ from ultralytics import YOLO
 from capstone_robot.utils import *
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/train/runs/detect/runs/upward_2/yolo11n_upward_2_640/weights/best.pt"
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole/yolo11n_640/weights/best.pt"
+DEFAULT_VIDEO = REPO_ROOT / r"src\capstone_robot\data\videos\may14\raw\pole.mp4"
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run a trained YOLO model on a video")
-    parser.add_argument("video", type=Path, help="input video path")
+    parser.add_argument("--video", type=Path, default=DEFAULT_VIDEO, help="input video path")
     parser.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="trained YOLO model path")
     parser.add_argument("--conf", type=float, default=0.4, help="confidence threshold")
     parser.add_argument("--imgsz", type=int, default=640, help="YOLO inference image size")
@@ -102,6 +104,14 @@ def main():
             frame = rotate_frame(frame, args.rotate)
             infer_start = time.time()
             result = model(frame, imgsz=args.imgsz, conf=args.conf, verbose=False)[0]
+            
+            ### plot only best detection
+            # if len(result.boxes) > 0:
+            #     best_box = result.boxes[result.boxes.conf.argmax()]
+            #     result.boxes = best_box
+            # detections = get_detections(result, frame)
+            # best_detection = max(detections, key=lambda x: x['conf'])
+
             infer_time = time.time() - infer_start
 
             annotated = result.plot()
@@ -113,8 +123,8 @@ def main():
                 writer.write(annotated)
 
             cv2.imshow(args.window_name, annotated)
-            cv2.waitKey(0)
-            key = cv2.waitKey(1) & 0xFF
+            # cv2.waitKey(0)
+            key = cv2.waitKey(10) & 0xFF
             if key == ord("q") or key == 27:
                 break
 

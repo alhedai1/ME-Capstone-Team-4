@@ -8,15 +8,14 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 
+from capstone_robot.utils import find_repo_root
 
-DEFAULT_VIDEO_PATH = Path(
-    r"C:\Users\ahmed\OneDrive\Desktop\Mechanical Engineering Courses\Capstone Design\ME-Capstone-Team-4\data\videos\phone\bell\bell-bottom.mp4"
-)
-DEFAULT_IMAGE_PATH = Path(
-    r"C:\Users\ahmed\OneDrive\Desktop\Mechanical Engineering Courses\Capstone Design\ME-Capstone-Team-4\data\extracted_frames\bell-bottom\rotated_90_ccw\frame_000170.jpg"
-)
+REPO_ROOT = find_repo_root(__file__)
+
+DEFAULT_VIDEO_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may14/raw/bellcenter.mp4"
+DEFAULT_IMAGE_PATH = REPO_ROOT / "src/capstone_robot/data/extracted_frames/bell-bottom/rotated_90_ccw/frame_000170.jpg"
 IMAGE_SUFFIXES = {".bmp", ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".webp"}
-DEFAULT_MODEL = Path(__file__).resolve().parents[1] / "train/runs/detect/runs/upward_2/yolo11n_upward_2_640/weights/best.pt"
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/train/runs/detect/runs/upward_2/yolo11n_upward_2_640/weights/best.pt"
 
 
 def parse_args():
@@ -685,7 +684,7 @@ def process_video(path, args, model):
                     cv2.imshow(f"{args.window_name}_edges", edges)
                 if args.show_dark_mask:
                     cv2.imshow(f"{args.window_name}_dark_mask", dark_mask)
-                key = cv2.waitKey(10) & 0xFF
+                key = cv2.waitKey(100) & 0xFF
                 if key == ord("q") or key == 27:
                     break
 
