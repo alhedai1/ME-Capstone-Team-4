@@ -150,43 +150,43 @@ def resolve_model_path(model_path):
 
     raise SystemExit(f"Model does not exist: {model_path}")
 
-def draw_status(frame, inference_fps, average_fps, frame_count):
-    cv2.putText(
-        frame,
-        f"infer FPS: {inference_fps:.1f}  avg FPS: {average_fps:.1f}  frame: {frame_count}",
-        (10, 30),
-        cv2.FONT_HERSHEY_SIMPLEX,
-        0.65,
-        (0, 255, 0),
-        2,
-        cv2.LINE_AA,
-    )
+# def draw_status(frame, inference_fps, average_fps, frame_count):
+#     cv2.putText(
+#         frame,
+#         f"infer FPS: {inference_fps:.1f}  avg FPS: {average_fps:.1f}  frame: {frame_count}",
+#         (10, 30),
+#         cv2.FONT_HERSHEY_SIMPLEX,
+#         0.65,
+#         (0, 255, 0),
+#         2,
+#         cv2.LINE_AA,
+#     )
 
-def get_detections(result, frame):
-    detections = []
-    if result.boxes is None:
-        return detections
+# def get_detections(result, frame):
+#     detections = []
+#     if result.boxes is None:
+#         return detections
 
-    names = result.names
-    for box in result.boxes:
-        cls_id = int(box.cls.item())
-        name = str(names.get(cls_id, cls_id)).lower()
-        x1, y1, x2, y2 = box.xyxy[0].tolist()
-        detections.append(
-            {
-                "class_id": cls_id,
-                "name": name,
-                "conf": float(box.conf.item()),
-                "box": clamp_box((x1, y1, x2, y2), frame.shape),
-            }
-        )
-    return detections
+#     names = result.names
+#     for box in result.boxes:
+#         cls_id = int(box.cls.item())
+#         name = str(names.get(cls_id, cls_id)).lower()
+#         x1, y1, x2, y2 = box.xyxy[0].tolist()
+#         detections.append(
+#             {
+#                 "class_id": cls_id,
+#                 "name": name,
+#                 "conf": float(box.conf.item()),
+#                 "box": clamp_box((x1, y1, x2, y2), frame.shape),
+#             }
+#         )
+#     return detections
 
-def clamp_box(box, frame_shape):
-    height, width = frame_shape[:2]
-    x1, y1, x2, y2 = box
-    x1 = max(0, min(width - 1, int(round(x1))))
-    y1 = max(0, min(height - 1, int(round(y1))))
-    x2 = max(x1 + 1, min(width, int(round(x2))))
-    y2 = max(y1 + 1, min(height, int(round(y2))))
-    return (x1, y1, x2, y2)
+# def clamp_box(box, frame_shape):
+#     height, width = frame_shape[:2]
+#     x1, y1, x2, y2 = box
+#     x1 = max(0, min(width - 1, int(round(x1))))
+#     y1 = max(0, min(height - 1, int(round(y1))))
+#     x2 = max(x1 + 1, min(width, int(round(x2))))
+#     y2 = max(y1 + 1, min(height, int(round(y2))))
+#     return (x1, y1, x2, y2)

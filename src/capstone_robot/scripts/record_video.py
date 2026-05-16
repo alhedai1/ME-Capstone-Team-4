@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils import *
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "data/test_videos"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "src/capstone_robot/data/test_videos"
 DEFAULT_OUTPUT = DEFAULT_OUTPUT_DIR / "recording.mp4"
 
 

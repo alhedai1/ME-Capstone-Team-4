@@ -7,6 +7,7 @@ import threading
 import time
 
 import cv2
+import gc
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -14,8 +15,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from utils import *
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_MODEL = REPO_ROOT / "models/pole_imx/network.rpk"
-DEFAULT_LABELS = REPO_ROOT / "models/labels.txt"
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole_imx/network.rpk"
+DEFAULT_LABELS = REPO_ROOT / "src/capstone_robot/models/pole_imx/labels.txt"
 
 
 @dataclass
@@ -34,7 +35,7 @@ def parse_args():
     parser.add_argument("--width", type=int, default=640, help="camera output width")
     parser.add_argument("--height", type=int, default=480, help="camera output height")
     parser.add_argument("--fps", type=float, default=30, help="camera framerate")
-    parser.add_argument("--conf", type=float, default=0.4, help="confidence threshold")
+    parser.add_argument("--conf", type=float, default=0.5, help="confidence threshold")
     parser.add_argument("--rotate", choices=["none", "cw", "ccw", "180"], default="none")
     parser.add_argument("--show", action="store_true", help="show local OpenCV preview window")
     parser.add_argument("--preview-port", type=int, default=1234, help="serve browser preview on this port; use 0 to disable")
@@ -105,20 +106,40 @@ class AiCamera:
         config = self.picam2.create_preview_configuration(
             main={"size": (width, height), "format": "RGB888"},
             controls={"FrameRate": fps},
-            buffer_count=12,
+            buffer_count=3,
         )
 
         print("Loading .rpk model onto Raspberry Pi AI Camera...")
         self.imx500.show_network_fw_progress_bar()
 
-        self.picam2.start(config, show_preview=False)
+        self.picam2.configure(config)
 
         if getattr(self.intrinsics, "preserve_aspect_ratio", False):
             self.imx500.set_auto_aspect_ratio()
 
+        print("Starting camera...")
+        self.picam2.start()
+
+        print("Waiting for IMX500 inference metadata...")
+        for i in range(60):
+            metadata = self.picam2.capture_metadata()
+            outputs = self.imx500.get_outputs(metadata, add_batch=True)
+
+            if outputs is not None:
+                print(f"IMX500 outputs ready after {i + 1} metadata frames")
+                break
+
+            time.sleep(0.1)
+        else:
+            print("WARNING: IMX500 outputs never became ready")
+
     def read(self):
-        frame = self.picam2.capture_array()
-        metadata = self.picam2.capture_metadata()
+        request = self.picam2.capture_request()
+        try:
+            frame = request.make_array("main")
+            metadata = request.get_metadata()
+        finally:
+            request.release()
 
         if frame is None or metadata is None:
             return False, None, None
@@ -177,7 +198,31 @@ class AiCamera:
         return detections
 
     def release(self):
-        self.picam2.stop()
+        print("Releasing camera...")
+
+        try:
+            self.picam2.stop()
+            time.sleep(0.5)
+        except Exception as e:
+            print(f"picam2.stop() error: {e}")
+
+        try:
+            self.picam2.close()
+            time.sleep(1.0)
+        except Exception as e:
+            print(f"picam2.close() error: {e}")
+
+        try:
+            del self.picam2
+        except Exception:
+            pass
+
+        try:
+            del self.imx500
+        except Exception:
+            pass
+
+        print("Camera released.")
 
 
 def resize_preview(frame, preview_width):
@@ -267,9 +312,16 @@ def main():
         display_host = "localhost" if host == "0.0.0.0" else host
         print(f"Preview stream: http://{display_host}:{port}")
 
+    last_detections = []
+    last_detection_time = 0.0
+    detection_hold_time = 0.0  # seconds
+
     frame_count = 0
     start_time = time.time()
     last_loop_time = start_time
+
+    smoothed_box = None
+    alpha = 0.3
 
     try:
         while True:
@@ -280,11 +332,37 @@ def main():
 
             frame = rotate_frame(frame, args.rotate)
 
-            detections = camera.get_detections(
+            new_detections = camera.get_detections(
                 metadata=metadata,
                 labels=labels,
                 threshold=args.conf,
             )
+
+            now = time.time()
+
+            if new_detections:
+                last_detections = new_detections
+                last_detection_time = now
+            
+            if now - last_detection_time <= detection_hold_time:
+                detections = last_detections
+            else:
+                detections = []
+
+            if len(detections) > 0:
+                best = max(detections, key=lambda d: d.confidence)
+                if smoothed_box is None:
+                    smoothed_box = best.box
+                else:
+                    x, y, w, h = best.box
+                    sx, sy, sw, sh = smoothed_box
+
+                    smoothed_box = (
+                        int(alpha * x + (1 - alpha) * sx),
+                        int(alpha * y + (1 - alpha) * sy),
+                        int(alpha * w + (1 - alpha) * sw),
+                        int(alpha * h + (1 - alpha) * sh),
+                    )
 
             # If you want to use this for control, this is the important part:
             # best.box gives x,y,w,h and its center tells you where the pole is.
@@ -316,11 +394,14 @@ def main():
     except KeyboardInterrupt:
         print("Stopping...")
     finally:
-        camera.release()
         if preview_server is not None:
             preview_server.stop()
         if args.show:
             cv2.destroyAllWindows()
+
+        camera.release()
+        gc.collect()
+        time.sleep(2.0)
 
     elapsed = time.time() - start_time
     average_fps = frame_count / elapsed if elapsed > 0 else 0.0
