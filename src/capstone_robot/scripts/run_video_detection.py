@@ -10,8 +10,8 @@ from ultralytics import YOLO
 from capstone_robot.utils import *
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole/yolo11n_640/weights/best.pt"
-DEFAULT_VIDEO = REPO_ROOT / r"src\capstone_robot\data\videos\may14\raw\pole.mp4"
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/upward_2/yolo11n_upward_2_640/weights/best.pt"
+DEFAULT_VIDEO = REPO_ROOT / r"src\capstone_robot\data\videos\may15\trimmed\test1_trim.mp4"
 
 
 def parse_args():
@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument("--conf", type=float, default=0.4, help="confidence threshold")
     parser.add_argument("--imgsz", type=int, default=640, help="YOLO inference image size")
     parser.add_argument("--output", type=Path, default=None, help="optional annotated output video path")
-    parser.add_argument("--rotate", choices=["none", "cw", "ccw", "180"], default="none")
+    parser.add_argument("--rotate", choices=["none", "cw", "ccw", "180"], default="180")
     parser.add_argument("--window-name", default="YOLO detection")
     return parser.parse_args()
 

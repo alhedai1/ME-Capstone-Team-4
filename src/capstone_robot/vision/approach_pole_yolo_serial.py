@@ -15,7 +15,7 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
-from capstone_robot.utils import find_repo_root
+from capstone_robot.utils import *
 
 REPO_ROOT = find_repo_root(__file__)
 DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole/yolo11n_640/weights/best_ncnn_model"

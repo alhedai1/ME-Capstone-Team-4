@@ -4,10 +4,11 @@ from pathlib import Path
 
 import cv2
 
+from capstone_robot.utils import find_repo_root
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_INPUT_DIR = REPO_ROOT / "data/videos/may_4_outdoors"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "data/extracted_frames/may_4_outdoors"
+REPO_ROOT = find_repo_root(__file__)
+DEFAULT_INPUT_DIR = REPO_ROOT / "src/capstone_robot/data/videos/may15/trimmed"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15"
 DEFAULT_FRAME_STEP = 15
 VIDEO_EXTENSIONS = {".avi", ".mov", ".mp4", ".m4v", ".mkv", ".webm"}
 # VIDEO_ROTATIONS = {

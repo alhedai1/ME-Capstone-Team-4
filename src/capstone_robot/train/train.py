@@ -9,13 +9,13 @@ def main():
     model = YOLO("yolo11n.pt")
 
     model.train(
-        data=REPO_ROOT.joinpath("src/capstone_robot/data/datasets/dataset_upward_2/data.yaml"),
+        data=REPO_ROOT.joinpath("src/capstone_robot/data/datasets/dataset_upward_3/data.yaml"),
         epochs=100,
         imgsz=640,
         batch=-1,
         workers=0,
-        project="runs/upward_2",
-        name="yolo11n_upward_2_640",
+        project="runs/upward_3",
+        name="yolo11n_upward_3_640",
         pretrained=True,
     )
 
