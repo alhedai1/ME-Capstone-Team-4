@@ -3,6 +3,11 @@ from transitions import Machine
 from gpiozero import Robot, Servo
 # import cv2 # For your Camera Module 3
 # from picamera2 import Picamera2 # For your AI Camera
+from capstone_robot.utils import *
+
+REPO_ROOT = find_repo_root(__file__)
+
+MODEL_PATH = REPO_ROOT / ""
 
 class CapstoneRobot(object):
     # Define your state names
@@ -12,6 +17,15 @@ class CapstoneRobot(object):
         # Hardware Setup (Adjust GPIO pins based on your hardware)
         self.motors = Robot(left=(7, 8), right=(9, 10))
         self.servo = Servo(11)
+        self.pi_camera = PiCamera(width=640, height=480, fps=30)
+        self.ai_camera = AiCamera(
+            model_path=MODEL_PATH,
+            width=640,
+            height=480,
+            fps=30,
+            bbox_normalization=True,
+            bbox_order="xy",
+        )
         
         # Initialize Finite State Machine
         self.machine = Machine(model=self, states=CapstoneRobot.states, initial='searching_pole')
@@ -26,11 +40,12 @@ class CapstoneRobot(object):
     def run_robot(self):
         while self.state != 'done':
             
+            # assume pole is already centered in frame
             if self.state == 'searching_pole':
                 print("[STATE] Searching for the pole...")
-                self.motors.forward(speed=0.3) # Slow cruise
+                # self.motors.forward(speed=0.3) # Slow cruise
                 # TODO: Insert AI Camera code here. If bounding box center matches:
-                # self.pole_found() 
+                self.pole_found() 
                 time.sleep(2) # Simulation block
                 self.pole_found()
 
