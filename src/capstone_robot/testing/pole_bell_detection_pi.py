@@ -12,12 +12,7 @@ from capstone_robot.utils import *
 # area/aspect (pole component)
 
 REPO_ROOT = find_repo_root(__file__)
-IMG_PATH = "../data/extracted_frames/may15/test1_trim/frame_000000.jpg"
-VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may15/trimmed/test1_trim.mp4"
-IMG_FOLDER = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim"
 
-img_paths = [img_path for img_path in IMG_FOLDER.iterdir()]
-# img_paths = [REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim/frame_001170.jpg"]
 
 
 # bright regions (hit by sunlight)
@@ -187,125 +182,84 @@ def signed_distance_to_line(px, py, line):
 #     vis = draw_line(vis, line)
 #     return vis
 
-### run on images folder
+### run on Pi camera feed
 
-# fig = plt.figure(figsize=(8, 6))
-
-# # img_path = IMG_PATH
-# for img_path in img_paths:
-#     print(img_path)
-#     img = cv2.imread(img_path)
-#     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-#     clean_mask = get_clean_pole_mask(hsv)
-#     pole_only = keep_pole_like_component(clean_mask)
-#     line = fit_line_from_mask(pole_only)
-
-#     # vis = img.copy()
-#     # if line is not None:
-#     #     vis = draw_line(vis, line)
-#     # else:
-#     #     print("No line detected")
-#     bell, circles = detect_bell(img)
-#     # vis2 = img.copy()
-#     # for x, y, r in circles:
-#     #     cv2.circle(vis2, (x, y), r, (255, 0, 0), 1)
-#     # if bell is not None:
-#     #     bx, by, br = bell
-#     #     cv2.circle(vis2, (bx, by), br, (0, 0, 255), 3)
-#     # else:
-#     #     print("No bell detected")
-
-#     ALIGN_THRESH_PX = 20
-#     vis = img.copy()
-#     if line is not None:
-#         vis = draw_line(vis, line)
-#     if bell is not None:
-#         bx, by, br = bell
-#         cv2.circle(vis, (bx, by), br, (0, 0, 255), 2)
-#         # cv2.circle(vis, (bx, by), 3, (0, 0, 255), -1)
-#     if line is not None and bell is not None:
-#         bx, by, _ = bell
-#         line = orient_line_toward_bell(
-#             line,
-#             pole_only,
-#             bell_center=(bx, by)
-#         )
-#         error = signed_distance_to_line(bx, by, line)
-
-#         if abs(error) < ALIGN_THRESH_PX:
-#             status = f"ALIGNED, error={error:.1f}"
-#         elif error > 0:
-#             status = f"RIGHT SIDE, error={error:.1f}"
-#         else:
-#             status = f"LEFT SIDE, error={error:.1f}"
-        
-#         vx, vy, x0, y0 = line
-#         cv2.putText(vis, status, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-#         show(fig, vis)
-#     else:
-#         print("Need both pole line and bell detection")
-
-
-cap = cv2.VideoCapture(str(VID_PATH))
-
-if not cap.isOpened():
-    raise RuntimeError(f"Could not open video: {VID_PATH}")
+camera = PiCamera(width=640, height=480, fps=30)
+preview_server = MjpegPreview(host="0.0.0.0", port=1234, jpeg_quality=75)
+preview_server.start()
+print("Preview stream: http://<RPI_IP_ADDRESS>:1234")
 
 ALIGN_THRESH_PX = 20
 
-while True:
-    ret, img = cap.read()
-    if not ret:
-        break
-    img = rotate_frame(img, "180")
+try:
+    while True:
+        ok, frame = camera.read()
+        if not ok or frame is None:
+            print("No camera frame received")
+            break
 
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    clean_mask = get_clean_pole_mask(hsv)
-    pole_only = keep_pole_like_component(clean_mask)
-    line = fit_line_from_mask(pole_only)
+        # PiCamera returns RGB888, but OpenCV processing/display expects BGR
+        img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-    bell, circles = detect_bell(img)
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        clean_mask = get_clean_pole_mask(hsv)
+        pole_only = keep_pole_like_component(clean_mask)
+        line = fit_line_from_mask(pole_only)
 
-    vis = img.copy()
+        bell, circles = detect_bell(img)
 
-    if line is not None:
-        vis = draw_line(vis, line)
+        vis = img.copy()
 
-    if bell is not None:
-        bx, by, br = bell
-        cv2.circle(vis, (bx, by), br, (0, 0, 255), 2)
+        if line is not None:
+            vis = draw_line(vis, line)
 
-    if line is not None and bell is not None:
-        bx, by, _ = bell
-        line = orient_line_toward_bell(
-            line,
-            pole_only,
-            bell_center=(bx, by)
-        )
-        error = signed_distance_to_line(bx, by, line)
+        if bell is not None:
+            bx, by, br = bell
+            cv2.circle(vis, (bx, by), br, (0, 0, 255), 2)
 
-        if abs(error) < ALIGN_THRESH_PX:
-            status = f"ALIGNED, error={error:.1f}"
-        elif error > 0:
-            status = f"RIGHT SIDE, error={error:.1f}"
+        if line is not None and bell is not None:
+            bx, by, _ = bell
+
+            line = orient_line_toward_bell(
+                line,
+                pole_only,
+                bell_center=(bx, by)
+            )
+
+            error = signed_distance_to_line(bx, by, line)
+
+            if abs(error) < ALIGN_THRESH_PX:
+                status = f"ALIGNED, error={error:.1f}"
+            elif error > 0:
+                status = f"RIGHT SIDE, error={error:.1f}"
+            else:
+                status = f"LEFT SIDE, error={error:.1f}"
+
+            cv2.putText(
+                vis,
+                status,
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 255),
+                2
+            )
         else:
-            status = f"LEFT SIDE, error={error:.1f}"
+            cv2.putText(
+                vis,
+                "Need pole line and bell",
+                (20, 40),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 0, 255),
+                2
+            )
 
-        cv2.putText(
-            vis,
-            status,
-            (20, 40),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 0, 255),
-            2
-        )
+        preview_server.update(resize_preview(vis, 640))
 
-    cv2.imshow("Pole bell detection", vis)
+except KeyboardInterrupt:
+    print("Stopping...")
 
-    key = cv2.waitKey(10) & 0xFF
-    if key == ord("q") or key == 27:
-        break
-
-cap.release()
-cv2.destroyAllWindows()
+finally:
+    preview_server.stop()
+    camera.release()
