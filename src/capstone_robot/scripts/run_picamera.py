@@ -28,7 +28,7 @@ def parse_args():
     parser.add_argument("--show", action="store_true", help="show local OpenCV preview window")
     parser.add_argument("--preview-port", type=int, default=1234, help="serve browser preview on this port; use 0 to disable")
     parser.add_argument("--preview-host", default="0.0.0.0", help="host/interface for browser preview")
-    parser.add_argument("--preview-width", type=int, default=320, help="browser preview width")
+    parser.add_argument("--preview-width", type=int, default=640, help="browser preview width")
     parser.add_argument("--jpeg-quality", type=int, default=50, help="MJPEG preview JPEG quality from 1 to 100")
     return parser.parse_args()
 

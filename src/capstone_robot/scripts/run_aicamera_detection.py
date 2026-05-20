@@ -75,154 +75,154 @@ def load_labels(labels_path):
     return labels if labels else None
 
 
-class AiCamera:
-    def __init__(self, model_path, width, height, fps, bbox_normalization=True, bbox_order="xy"):
-        try:
-            from picamera2 import Picamera2
-            from picamera2.devices import IMX500
-            from picamera2.devices.imx500 import NetworkIntrinsics
-        except ImportError as exc:
-            raise RuntimeError(
-                "Picamera2 IMX500 support is not installed. Try:\n"
-                "  sudo apt update\n"
-                "  sudo apt install -y imx500-all python3-picamera2 python3-opencv"
-            ) from exc
+# class AiCamera:
+#     def __init__(self, model_path, width, height, fps, bbox_normalization=True, bbox_order="xy"):
+#         try:
+#             from picamera2 import Picamera2
+#             from picamera2.devices import IMX500
+#             from picamera2.devices.imx500 import NetworkIntrinsics
+#         except ImportError as exc:
+#             raise RuntimeError(
+#                 "Picamera2 IMX500 support is not installed. Try:\n"
+#                 "  sudo apt update\n"
+#                 "  sudo apt install -y imx500-all python3-picamera2 python3-opencv"
+#             ) from exc
 
-        self.imx500 = IMX500(str(model_path))
+#         self.imx500 = IMX500(str(model_path))
 
-        self.intrinsics = self.imx500.network_intrinsics
-        if not self.intrinsics:
-            self.intrinsics = NetworkIntrinsics()
-            self.intrinsics.task = "object detection"
+#         self.intrinsics = self.imx500.network_intrinsics
+#         if not self.intrinsics:
+#             self.intrinsics = NetworkIntrinsics()
+#             self.intrinsics.task = "object detection"
 
-        self.intrinsics.bbox_normalization = bbox_normalization
-        self.intrinsics.bbox_order = bbox_order
-        self.intrinsics.update_with_defaults()
+#         self.intrinsics.bbox_normalization = bbox_normalization
+#         self.intrinsics.bbox_order = bbox_order
+#         self.intrinsics.update_with_defaults()
 
-        self.picam2 = Picamera2(self.imx500.camera_num)
+#         self.picam2 = Picamera2(self.imx500.camera_num)
 
-        # Use RGB888 because OpenCV display/encoding is simple and predictable.
-        # The IMX500 inference runs on the AI camera; the Pi only reads metadata.
-        config = self.picam2.create_preview_configuration(
-            main={"size": (width, height), "format": "RGB888"},
-            controls={"FrameRate": fps},
-            buffer_count=3,
-        )
+#         # Use RGB888 because OpenCV display/encoding is simple and predictable.
+#         # The IMX500 inference runs on the AI camera; the Pi only reads metadata.
+#         config = self.picam2.create_preview_configuration(
+#             main={"size": (width, height), "format": "RGB888"},
+#             controls={"FrameRate": fps},
+#             buffer_count=3,
+#         )
 
-        print("Loading .rpk model onto Raspberry Pi AI Camera...")
-        self.imx500.show_network_fw_progress_bar()
+#         print("Loading .rpk model onto Raspberry Pi AI Camera...")
+#         self.imx500.show_network_fw_progress_bar()
 
-        self.picam2.configure(config)
+#         self.picam2.configure(config)
 
-        if getattr(self.intrinsics, "preserve_aspect_ratio", False):
-            self.imx500.set_auto_aspect_ratio()
+#         if getattr(self.intrinsics, "preserve_aspect_ratio", False):
+#             self.imx500.set_auto_aspect_ratio()
 
-        print("Starting camera...")
-        self.picam2.start()
+#         print("Starting camera...")
+#         self.picam2.start()
 
-        print("Waiting for IMX500 inference metadata...")
-        for i in range(60):
-            metadata = self.picam2.capture_metadata()
-            outputs = self.imx500.get_outputs(metadata, add_batch=True)
+#         print("Waiting for IMX500 inference metadata...")
+#         for i in range(60):
+#             metadata = self.picam2.capture_metadata()
+#             outputs = self.imx500.get_outputs(metadata, add_batch=True)
 
-            if outputs is not None:
-                print(f"IMX500 outputs ready after {i + 1} metadata frames")
-                break
+#             if outputs is not None:
+#                 print(f"IMX500 outputs ready after {i + 1} metadata frames")
+#                 break
 
-            time.sleep(0.1)
-        else:
-            print("WARNING: IMX500 outputs never became ready")
+#             time.sleep(0.1)
+#         else:
+#             print("WARNING: IMX500 outputs never became ready")
 
-    def read(self):
-        request = self.picam2.capture_request()
-        try:
-            frame = request.make_array("main")
-            metadata = request.get_metadata()
-        finally:
-            request.release()
+#     def read(self):
+#         request = self.picam2.capture_request()
+#         try:
+#             frame = request.make_array("main")
+#             metadata = request.get_metadata()
+#         finally:
+#             request.release()
 
-        if frame is None or metadata is None:
-            return False, None, None
+#         if frame is None or metadata is None:
+#             return False, None, None
 
-        return True, frame, metadata
+#         return True, frame, metadata
 
-    def get_detections(self, metadata, labels=None, threshold=0.4):
-        outputs = self.imx500.get_outputs(metadata, add_batch=True)
+#     def get_detections(self, metadata, labels=None, threshold=0.4):
+#         outputs = self.imx500.get_outputs(metadata, add_batch=True)
 
-        if outputs is None:
-            return []
+#         if outputs is None:
+#             return []
 
-        # For Ultralytics YOLO11n/YOOv8n IMX export with NMS/postprocess included,
-        # the usual output order is: boxes, scores, classes.
-        if len(outputs) < 3:
-            return []
+#         # For Ultralytics YOLO11n/YOOv8n IMX export with NMS/postprocess included,
+#         # the usual output order is: boxes, scores, classes.
+#         if len(outputs) < 3:
+#             return []
 
-        boxes = outputs[0][0]
-        scores = outputs[1][0]
-        classes = outputs[2][0]
+#         boxes = outputs[0][0]
+#         scores = outputs[1][0]
+#         classes = outputs[2][0]
 
-        if boxes is None or scores is None or classes is None:
-            return []
+#         if boxes is None or scores is None or classes is None:
+#             return []
 
-        input_w, input_h = self.imx500.get_input_size()
+#         input_w, input_h = self.imx500.get_input_size()
 
-        if self.intrinsics.bbox_normalization:
-            boxes = boxes / input_h
+#         if self.intrinsics.bbox_normalization:
+#             boxes = boxes / input_h
 
-        if self.intrinsics.bbox_order == "xy":
-            # Convert xyxy -> yxyx before convert_inference_coords(), matching
-            # Raspberry Pi's official IMX500 object-detection example pattern.
-            boxes = boxes[:, [1, 0, 3, 2]]
+#         if self.intrinsics.bbox_order == "xy":
+#             # Convert xyxy -> yxyx before convert_inference_coords(), matching
+#             # Raspberry Pi's official IMX500 object-detection example pattern.
+#             boxes = boxes[:, [1, 0, 3, 2]]
 
-        detections = []
-        for box, score, cls in zip(boxes, scores, classes):
-            confidence = float(score)
-            if confidence < threshold:
-                continue
+#         detections = []
+#         for box, score, cls in zip(boxes, scores, classes):
+#             confidence = float(score)
+#             if confidence < threshold:
+#                 continue
 
-            class_id = int(cls)
-            if labels is not None and 0 <= class_id < len(labels):
-                label = labels[class_id]
-            else:
-                label = str(class_id)
+#             class_id = int(cls)
+#             if labels is not None and 0 <= class_id < len(labels):
+#                 label = labels[class_id]
+#             else:
+#                 label = str(class_id)
 
-            x, y, w, h = self.imx500.convert_inference_coords(box, metadata, self.picam2)
-            detections.append(
-                Detection(
-                    label=label,
-                    confidence=confidence,
-                    box=(int(x), int(y), int(w), int(h)),
-                )
-            )
+#             x, y, w, h = self.imx500.convert_inference_coords(box, metadata, self.picam2)
+#             detections.append(
+#                 Detection(
+#                     label=label,
+#                     confidence=confidence,
+#                     box=(int(x), int(y), int(w), int(h)),
+#                 )
+#             )
 
-        return detections
+#         return detections
 
-    def release(self):
-        print("Releasing camera...")
+#     def release(self):
+#         print("Releasing camera...")
 
-        try:
-            self.picam2.stop()
-            time.sleep(0.5)
-        except Exception as e:
-            print(f"picam2.stop() error: {e}")
+#         try:
+#             self.picam2.stop()
+#             time.sleep(0.5)
+#         except Exception as e:
+#             print(f"picam2.stop() error: {e}")
 
-        try:
-            self.picam2.close()
-            time.sleep(1.0)
-        except Exception as e:
-            print(f"picam2.close() error: {e}")
+#         try:
+#             self.picam2.close()
+#             time.sleep(1.0)
+#         except Exception as e:
+#             print(f"picam2.close() error: {e}")
 
-        try:
-            del self.picam2
-        except Exception:
-            pass
+#         try:
+#             del self.picam2
+#         except Exception:
+#             pass
 
-        try:
-            del self.imx500
-        except Exception:
-            pass
+#         try:
+#             del self.imx500
+#         except Exception:
+#             pass
 
-        print("Camera released.")
+#         print("Camera released.")
 
 
 def resize_preview(frame, preview_width):

@@ -4,6 +4,9 @@ from pathlib import Path
 
 import cv2
 
+from gpiozero import DistanceSensor
+from time import sleep
+
 from capstone_robot.utils import AiCamera, MjpegPreview, find_repo_root, resize_preview
 
 
@@ -36,7 +39,7 @@ def parse_args():
     parser.add_argument("--preview-width", type=int, default=640)
     parser.add_argument("--jpeg-quality", type=int, default=75)
     parser.add_argument("--hold-frames", type=int, default=5, help="keep last pole box through brief misses")
-    parser.add_argument("--smooth-alpha", type=float, default=0.5, help="box smoothing factor from 0 to 1")
+    parser.add_argument("--smooth-alpha", type=float, default=0.75, help="box smoothing factor from 0 to 1")
     return parser.parse_args()
 
 
@@ -89,6 +92,8 @@ def main():
         bbox_normalization=args.bbox_normalization,
         bbox_order=args.bbox_order,
     )
+
+    # sensor = DistanceSensor(echo=24, trigger=23)
 
     preview = None
     if args.preview_port > 0:
