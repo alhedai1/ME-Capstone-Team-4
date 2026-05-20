@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument("--preview-width", type=int, default=640)
     parser.add_argument("--jpeg-quality", type=int, default=75)
     parser.add_argument("--hold-frames", type=int, default=5, help="keep last pole box through brief misses")
-    parser.add_argument("--smooth-alpha", type=float, default=0.35, help="box smoothing factor from 0 to 1")
+    parser.add_argument("--smooth-alpha", type=float, default=0.5, help="box smoothing factor from 0 to 1")
     return parser.parse_args()
 
 
@@ -109,7 +109,8 @@ def main():
 
             detections = camera.get_detections(metadata, labels=labels, threshold=args.conf)
             new_pole = choose_pole(detections, args.target_label)
-            annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            # annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            annotated = frame
 
             if new_pole is not None:
                 missed_frames = 0
