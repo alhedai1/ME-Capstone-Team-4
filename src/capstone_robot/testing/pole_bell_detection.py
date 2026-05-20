@@ -6,7 +6,7 @@ import sys
 from capstone_robot.utils import *
 
 
-# SOMETHING IS WRONG WITH COMPUTING THE DISTANCE BETWEEN BELL CENTER AND POLE CENTERLINE
+picam = PiCamera()
 
 
 ### Tuning Parameters ###

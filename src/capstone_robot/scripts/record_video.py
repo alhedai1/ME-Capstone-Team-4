@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument("--show", action="store_true", help="show preview window")
     parser.add_argument("--preview-port", type=int, default=1234, help="serve browser preview on this port")
     parser.add_argument("--preview-host", default="0.0.0.0", help="host/interface for browser preview")
-    parser.add_argument("--preview-width", type=int, default=640, help="browser preview width")
+    parser.add_argument("--preview-width", type=int, default=320, help="browser preview width")
     args = parser.parse_args()
     if args.output is None:
         args.output = output_path_from_name(args.name) if args.name else DEFAULT_OUTPUT

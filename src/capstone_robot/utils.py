@@ -150,17 +150,17 @@ def resolve_model_path(model_path):
 
     raise SystemExit(f"Model does not exist: {model_path}")
 
-# def draw_status(frame, inference_fps, average_fps, frame_count):
-#     cv2.putText(
-#         frame,
-#         f"infer FPS: {inference_fps:.1f}  avg FPS: {average_fps:.1f}  frame: {frame_count}",
-#         (10, 30),
-#         cv2.FONT_HERSHEY_SIMPLEX,
-#         0.65,
-#         (0, 255, 0),
-#         2,
-#         cv2.LINE_AA,
-#     )
+def draw_status(frame, inference_fps, average_fps, frame_count):
+    cv2.putText(
+        frame,
+        f"infer FPS: {inference_fps:.1f}  avg FPS: {average_fps:.1f}  frame: {frame_count}",
+        (10, 30),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.65,
+        (0, 255, 0),
+        2,
+        cv2.LINE_AA,
+    )
 
 # def get_detections(result, frame):
 #     detections = []

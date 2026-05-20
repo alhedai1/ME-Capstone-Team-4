@@ -10,9 +10,9 @@ import cv2
 import gc
 
 import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from utils import *
+from capstone_robot.utils import *
 
 REPO_ROOT = find_repo_root(__file__)
 DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole_imx/network.rpk"

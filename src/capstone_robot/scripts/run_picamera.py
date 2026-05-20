@@ -6,12 +6,13 @@ import threading
 import time
 
 import cv2
-from ultralytics import YOLO
+# from ultralytics import YOLO
 
-import sys
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# import sys
+# sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from utils import *
+# from utils import *
+from capstone_robot.utils import *
 
 REPO_ROOT = find_repo_root(__file__)
 
