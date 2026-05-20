@@ -45,6 +45,7 @@ class CapstoneRobot(object):
                 print("[STATE] Searching for the pole...")
                 # self.motors.forward(speed=0.3) # Slow cruise
                 # TODO: Insert AI Camera code here. If bounding box center matches:
+                approach_pole()
                 self.pole_found() 
                 time.sleep(2) # Simulation block
                 self.pole_found()
