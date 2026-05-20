@@ -3,12 +3,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-from capstone_robot.utils import find_repo_root
+from capstone_robot.utils import find_repo_root, rotate_frame
 
 REPO_ROOT = find_repo_root(__file__)
 
 img_path = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim/frame_000045.jpg"
-img_folder = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim"
+img_folder = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may18/robot_test_left"
 
 
 def filter_lines(lines):
@@ -38,9 +38,9 @@ def get_segments(lines):
             
             # Filter for the vertical converging angles of your pole
             # Left edge leans right (/), Right edge leans left (\)
-            if -90 <= angle < -60: 
+            if -90 <= angle < -70: 
                 left_pole_segments.append((x1, y1, x2, y2))
-            elif 60 < angle <= 90:
+            elif 70 < angle <= 90:
                 right_pole_segments.append((x1, y1, x2, y2))
 
     #         if 45 < np.abs(angle) < 135:
@@ -105,7 +105,7 @@ def detect_lines_circles(gray, blurred):
     edges = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
                               cv2.THRESH_BINARY_INV, 11, 2)
 
-    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=30, minLineLength=50, maxLineGap=5)
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=30, minLineLength=40, maxLineGap=5)
 
     # lines = filter_lines(lines)
     circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=150, param2=20, minRadius=0, maxRadius=30)
