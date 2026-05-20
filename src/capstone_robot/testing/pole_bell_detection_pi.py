@@ -197,10 +197,7 @@ try:
         if not ok or frame is None:
             print("No camera frame received")
             break
-
-        # PiCamera returns RGB888, but OpenCV processing/display expects BGR
-        img = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-
+        img = frame
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         clean_mask = get_clean_pole_mask(hsv)
         pole_only = keep_pole_like_component(clean_mask)

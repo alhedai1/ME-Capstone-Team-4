@@ -10,6 +10,7 @@ import time
 from dataclasses import dataclass
 
 
+
 def find_repo_root(start_path):
     """
     Walk up the directory tree from start_path until finding a .git directory,
@@ -36,6 +37,7 @@ class PiCamera:
     def __init__(self, width, height, fps):
         try:
             from picamera2 import Picamera2
+            from libcamera import controls
         except ImportError as exc:
             raise RuntimeError("Picamera2 is not installed. Install python3-picamera2 on the Raspberry Pi.") from exc
 
@@ -45,6 +47,7 @@ class PiCamera:
             controls={"FrameRate": fps},
         )
         self.picam2.configure(config)
+        self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         self.picam2.start()
 
     def read(self):
