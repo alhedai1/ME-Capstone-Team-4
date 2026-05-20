@@ -2,7 +2,9 @@
 import argparse
 from pathlib import Path
 
-from capstone_robot.utils import AiCamera, find_repo_root
+import cv2
+
+from capstone_robot.utils import AiCamera, MjpegPreview, find_repo_root, resize_preview
 
 
 REPO_ROOT = find_repo_root(__file__)
@@ -29,6 +31,10 @@ def parse_args():
     parser.add_argument("--bbox-order", choices=["xy", "yx"], default="xy")
     parser.add_argument("--bbox-normalization", action="store_true", default=True)
     parser.add_argument("--no-bbox-normalization", dest="bbox_normalization", action="store_false")
+    parser.add_argument("--preview-host", default="0.0.0.0")
+    parser.add_argument("--preview-port", type=int, default=1234, help="use 0 to disable browser preview")
+    parser.add_argument("--preview-width", type=int, default=640)
+    parser.add_argument("--jpeg-quality", type=int, default=75)
     return parser.parse_args()
 
 
@@ -49,6 +55,16 @@ def steering_from_error(error_x, deadband):
     return "STRAIGHT"
 
 
+def draw_status(frame, pole, steering, error_x):
+    if pole is not None:
+        x, y, w, h = pole.box
+        cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.circle(frame, (int(x + w / 2), int(y + h / 2)), 4, (0, 255, 0), -1)
+
+    text = "NO POLE" if pole is None else f"{steering}  error_x={error_x:.1f}px"
+    cv2.putText(frame, text, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+
 def main():
     args = parse_args()
     labels = load_labels(args.labels)
@@ -62,6 +78,12 @@ def main():
         bbox_order=args.bbox_order,
     )
 
+    preview = None
+    if args.preview_port > 0:
+        preview = MjpegPreview(args.preview_host, args.preview_port, args.jpeg_quality)
+        preview.start()
+        print(f"Preview stream: http://<RPI_IP_ADDRESS>:{args.preview_port}")
+
     try:
         while True:
             ok, frame, metadata = camera.read()
@@ -71,9 +93,13 @@ def main():
 
             detections = camera.get_detections(metadata, labels=labels, threshold=args.conf)
             pole = choose_pole(detections, args.target_label)
+            annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
             if pole is None:
                 print("NO POLE")
+                draw_status(annotated, None, None, 0.0)
+                if preview is not None:
+                    preview.update(resize_preview(annotated, args.preview_width))
                 continue
 
             x, y, w, h = pole.box
@@ -87,9 +113,15 @@ def main():
                 f"center_x={pole_center_x:.1f}, conf={pole.confidence:.2f}, box=({x},{y},{w},{h})"
             )
 
+            draw_status(annotated, pole, steering, error_x)
+            if preview is not None:
+                preview.update(resize_preview(annotated, args.preview_width))
+
     except KeyboardInterrupt:
         print("Stopping...")
     finally:
+        if preview is not None:
+            preview.stop()
         camera.release()
 
 
