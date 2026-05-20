@@ -35,6 +35,8 @@ def parse_args():
     parser.add_argument("--preview-port", type=int, default=1234, help="use 0 to disable browser preview")
     parser.add_argument("--preview-width", type=int, default=640)
     parser.add_argument("--jpeg-quality", type=int, default=75)
+    parser.add_argument("--hold-frames", type=int, default=5, help="keep last pole box through brief misses")
+    parser.add_argument("--smooth-alpha", type=float, default=0.35, help="box smoothing factor from 0 to 1")
     return parser.parse_args()
 
 
@@ -53,6 +55,16 @@ def steering_from_error(error_x, deadband):
     if error_x > deadband:
         return "RIGHT"
     return "STRAIGHT"
+
+
+def smooth_box(old_box, new_box, alpha):
+    if old_box is None:
+        return new_box
+
+    return tuple(
+        int(alpha * new + (1.0 - alpha) * old)
+        for old, new in zip(old_box, new_box)
+    )
 
 
 def draw_status(frame, pole, steering, error_x):
@@ -84,6 +96,10 @@ def main():
         preview.start()
         print(f"Preview stream: http://<RPI_IP_ADDRESS>:{args.preview_port}")
 
+    last_pole = None
+    smoothed_box = None
+    missed_frames = 0
+
     try:
         while True:
             ok, frame, metadata = camera.read()
@@ -92,8 +108,21 @@ def main():
                 break
 
             detections = camera.get_detections(metadata, labels=labels, threshold=args.conf)
-            pole = choose_pole(detections, args.target_label)
+            new_pole = choose_pole(detections, args.target_label)
             annotated = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+            if new_pole is not None:
+                missed_frames = 0
+                smoothed_box = smooth_box(smoothed_box, new_pole.box, args.smooth_alpha)
+                new_pole.box = smoothed_box
+                last_pole = new_pole
+            else:
+                missed_frames += 1
+                if missed_frames > args.hold_frames:
+                    last_pole = None
+                    smoothed_box = None
+
+            pole = last_pole
 
             if pole is None:
                 print("NO POLE")
