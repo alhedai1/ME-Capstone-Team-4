@@ -74,6 +74,8 @@ class CapstoneRobot(object):
         self.pole_conf_threshold = 0.5
         self.pole_center_deadband_px = 35
         self.pole_stable_frames_required = 5
+        self.search_missed_frame_limit = 6
+        self.pole_smooth_alpha = 0.75
         self.search_turn_speed = 0.25
         self.center_turn_speed = 0.18
         self.approach_speed = 0.05

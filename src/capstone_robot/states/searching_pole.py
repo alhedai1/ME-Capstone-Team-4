@@ -14,8 +14,21 @@ def update_preview(robot, frame, pole, status):
     robot.update_preview(vis)
 
 
+def smooth_box(old_box, new_box, alpha):
+    if old_box is None:
+        return new_box
+
+    return tuple(
+        int(alpha * new + (1.0 - alpha) * old)
+        for old, new in zip(old_box, new_box)
+    )
+
+
 def run(robot):
     stable_frames = 0
+    missed_frames = 0
+    last_pole = None
+    smoothed_box = None
 
     while robot.state == "searching_pole":
         frame, pole = robot.detect_pole()
@@ -26,12 +39,31 @@ def run(robot):
             continue
 
         if pole is None:
+            missed_frames += 1
+
+            if last_pole is not None and missed_frames <= robot.search_missed_frame_limit:
+                print(
+                    f"[SEARCH] Pole briefly lost ({missed_frames}/{robot.search_missed_frame_limit}); "
+                    "holding position"
+                )
+                update_preview(robot, frame, last_pole, f"SEARCH: HOLD {missed_frames}")
+                robot.motors.stop()
+                time.sleep(0.05)
+                continue
+
             stable_frames = 0
+            last_pole = None
+            smoothed_box = None
             print("[SEARCH] Pole not detected; rotating slowly")
             update_preview(robot, frame, None, "SEARCH: NO POLE")
             robot.motors.right(robot.search_turn_speed)
             time.sleep(0.05)
             continue
+
+        missed_frames = 0
+        smoothed_box = smooth_box(smoothed_box, pole.box, robot.pole_smooth_alpha)
+        pole.box = smoothed_box
+        last_pole = pole
 
         x, y, w, h = pole.box
         pole_center_x = x + w / 2.0
