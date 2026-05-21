@@ -18,7 +18,9 @@ from transitions import Machine
 from gpiozero import Robot, Servo
 # import cv2 # For your Camera Module 3
 # from picamera2 import Picamera2 # For your AI Camera
+from capstone_robot.states import approaching_pole, aligning_bell, climbing_pole, searching_pole, striking_bell
 from capstone_robot.utils import *
+from capstone_robot.vision.pole_bell import PoleBellTracker
 
 REPO_ROOT = find_repo_root(__file__)
 
@@ -46,6 +48,7 @@ class CapstoneRobot(object):
 
     def __init__(self):
         # Hardware Setup (Adjust GPIO pins based on your hardware)
+        # physical pins: left=(26, 24), right=(21, 19)
         self.motors = Robot(left=(7, 8), right=(9, 10))
         self.servo = Servo(11)
         self.pi_camera = PiCamera(width=640, height=480, fps=30)
@@ -58,12 +61,24 @@ class CapstoneRobot(object):
             bbox_order="xy",
         )
         self.ai_labels = load_labels(LABELS_PATH)
+        self.pole_bell_tracker = PoleBellTracker()
 
         self.pole_conf_threshold = 0.5
         self.pole_center_deadband_px = 35
         self.pole_stable_frames_required = 5
         self.search_turn_speed = 0.25
         self.center_turn_speed = 0.18
+        self.approach_speed = 0.35
+        self.approach_steer_gain = 0.8
+        self.approach_stop_width_fraction = 0.65
+        self.approach_stop_frames_required = 3
+        self.approach_missed_frame_limit = 10
+        self.align_turn_speed = 0.35
+        self.align_quarter_turn_seconds = 1.2
+        self.orbit_speed = 0.25
+        self.alignment_error_threshold_px = 20
+        self.alignment_stable_frames_required = 4
+        self.alignment_missed_frame_limit = 15
         
         # Initialize Finite State Machine
         self.machine = Machine(model=self, states=CapstoneRobot.states, initial='searching_pole')
@@ -75,57 +90,58 @@ class CapstoneRobot(object):
         self.machine.add_transition(trigger='bell_detected', source='climbing_pole', dest='striking_bell')
         self.machine.add_transition(trigger='mission_complete', source='striking_bell', dest='done')
 
+    def detect_pole(self):
+        ok, frame, metadata = self.ai_camera.read()
+        if not ok:
+            return None, None
+
+        detections = self.ai_camera.get_detections(
+            metadata=metadata,
+            labels=self.ai_labels,
+            threshold=self.pole_conf_threshold,
+        )
+        return frame, choose_pole(detections)
+
+    def drive_tank(self, left_speed, right_speed):
+        left_speed = max(-1.0, min(1.0, left_speed))
+        right_speed = max(-1.0, min(1.0, right_speed))
+        self.motors.value = (left_speed, right_speed)
+
+    def turn_in_place(self, direction, seconds, speed=None):
+        speed = self.align_turn_speed if speed is None else speed
+
+        if direction == "left":
+            self.motors.left(speed)
+        else:
+            self.motors.right(speed)
+
+        time.sleep(seconds)
+        self.motors.stop()
+        time.sleep(0.2)
+
+    def opposite_direction(self, direction):
+        return "left" if direction == "right" else "right"
+
     def search_for_pole(self):
-        stable_frames = 0
+        searching_pole.run(self)
 
-        while self.state == 'searching_pole':
-            ok, frame, metadata = self.ai_camera.read()
-            if not ok:
-                print("[WARN] No AI camera frame/metadata received")
-                self.motors.stop()
-                time.sleep(0.1)
-                continue
+    def approach_pole(self):
+        approaching_pole.run(self)
 
-            detections = self.ai_camera.get_detections(
-                metadata=metadata,
-                labels=self.ai_labels,
-                threshold=self.pole_conf_threshold,
-            )
-            pole = choose_pole(detections)
+    def read_upward_alignment(self):
+        return aligning_bell.read_upward_alignment(self)
 
-            if pole is None:
-                stable_frames = 0
-                print("[SEARCH] Pole not detected; rotating slowly")
-                self.motors.right(self.search_turn_speed)
-                time.sleep(0.05)
-                continue
+    def wait_for_bell_side(self):
+        return aligning_bell.wait_for_bell_side(self)
 
-            x, y, w, h = pole.box
-            pole_center_x = x + w / 2.0
-            frame_center_x = frame.shape[1] / 2.0
-            error_x = pole_center_x - frame_center_x
+    def orbit_until_bell_aligned(self):
+        return aligning_bell.orbit_until_bell_aligned(self)
 
-            if abs(error_x) <= self.pole_center_deadband_px:
-                stable_frames += 1
-                self.motors.stop()
-                print(
-                    f"[SEARCH] Pole centered ({stable_frames}/{self.pole_stable_frames_required}), "
-                    f"error_x={error_x:.1f}px, conf={pole.confidence:.2f}"
-                )
+    def center_front_pole_for_climb(self):
+        return aligning_bell.center_front_pole_for_climb(self)
 
-                if stable_frames >= self.pole_stable_frames_required:
-                    self.pole_found()
-                    return
-            else:
-                stable_frames = 0
-                if error_x < 0:
-                    print(f"[SEARCH] Pole left of center, error_x={error_x:.1f}px")
-                    self.motors.left(self.center_turn_speed)
-                else:
-                    print(f"[SEARCH] Pole right of center, error_x={error_x:.1f}px")
-                    self.motors.right(self.center_turn_speed)
-
-            time.sleep(0.05)
+    def align_to_bell(self):
+        aligning_bell.run(self)
 
     def run_robot(self):
         while self.state != 'done':
@@ -136,42 +152,23 @@ class CapstoneRobot(object):
 
             elif self.state == 'approaching_pole':
                 print("[STATE] Approaching pole...")
-                # TODO: Use vision data to correct steering (Differential Drive)
-                # stop when close to pole, based on size of pole in frame
-                self.pole_reached()
+                self.approach_pole()
 
             elif self.state == 'aligning_bell':
                 print("[STATE] Aligning to bell...")
-                # TODO: Use Pi Camera and opencv to detect pole and bell, and detect which side bell is on, and error between pole centerline and bell center
-                # rotate left or right 90 degrees.
-                # move around pole, continuously detecting pole and bell until pole centerline aligns with bell center
-                # stop and rotate towards pole, use front camera to center pole in frame
-                self.aligned()
+                self.align_to_bell()
 
             elif self.state == 'climbing_pole':
-                print("[STATE] Climbing pole...")
-                # move forward a bit so front wheels 
-                # Engage full power to overcome gravity
-                # self.motors.forward(speed=1.0) 
-                # TODO: Camera Module 3 checks for the bell overhead via HSV contour tracking
-                time.sleep(3) # Simulation block
-                self.bell_detected()
+                climbing_pole.run(self)
 
             elif self.state == 'striking_bell':
-                print("[STATE] Bell within reach! Striking...")
-                self.motors.stop()
-                
-                # Actuate the servo arm to hit the bell
-                self.servo.min()
-                time.sleep(0.5)
-                self.servo.max() # Quick swing
-                time.sleep(0.5)
-                self.servo.detach() # Turn off servo to save power
-                
-                self.mission_complete()
+                striking_bell.run(self)
 
         print("[INFO] Robot execution successfully completed.")
 
 if __name__ == "__main__":
+    # robot = CapstoneRobot()
+    # robot.run_robot()
     robot = CapstoneRobot()
-    robot.run_robot()
+    # robot.search_for_pole()
+    robot.align_to_bell()

@@ -25,7 +25,7 @@ LOWER_BRIGHT = np.array([0, 0, 200])
 UPPER_BRIGHT = np.array([50, 50, 255])
 # dark regions
 LOWER_DARK = np.array([100, 0, 0])
-UPPER_DARK = np.array([200, 100, 60])
+UPPER_DARK = np.array([200, 100, 80])
 
 def show(figure, img, title="", cmap=None):
     if img.ndim == 2:
