@@ -36,7 +36,7 @@ def parse_args():
     parser.add_argument("--no-bbox-normalization", dest="bbox_normalization", action="store_false")
     parser.add_argument("--preview-host", default="0.0.0.0")
     parser.add_argument("--preview-port", type=int, default=1234, help="use 0 to disable browser preview")
-    parser.add_argument("--preview-width", type=int, default=640)
+    parser.add_argument("--preview-width", type=int, default=320)
     parser.add_argument("--jpeg-quality", type=int, default=75)
     parser.add_argument("--hold-frames", type=int, default=5, help="keep last pole box through brief misses")
     parser.add_argument("--smooth-alpha", type=float, default=0.75, help="box smoothing factor from 0 to 1")

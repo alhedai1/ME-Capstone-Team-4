@@ -49,9 +49,12 @@ class CapstoneRobot(object):
 
     def __init__(self):
         # Hardware Setup (Adjust GPIO pins based on your hardware)
-        # physical pins: left=(26, 24), right=(21, 19)
-        self.motors = Robot(left=(7, 8), right=(9, 10))
-        self.servo = Servo(11)
+        self.left_rpwm = 'BOARD36'
+        self.left_lpwm = 'BOARD37'
+        self.right_rpwm = 'BOARD29'
+        self.right_lpwm = 'BOARD31'
+        self.motors = Robot(left=(self.left_lpwm, self.left_rpwm), right=(self.right_lpwm, self.right_rpwm))
+        # self.servo = Servo(11)
         self.pi_camera = PiCamera(width=640, height=480, fps=30)
         self.ai_camera = AiCamera(
             model_path=MODEL_PATH,
@@ -63,7 +66,7 @@ class CapstoneRobot(object):
         )
         self.ai_labels = load_labels(LABELS_PATH)
         self.pole_bell_tracker = PoleBellTracker()
-        self.preview_width = 640
+        self.preview_width = 320
         self.preview_server = MjpegPreview(host="0.0.0.0", port=1234, jpeg_quality=75)
         self.preview_server.start()
         print("Preview stream: http://<RPI_IP_ADDRESS>:1234")
@@ -73,7 +76,7 @@ class CapstoneRobot(object):
         self.pole_stable_frames_required = 5
         self.search_turn_speed = 0.25
         self.center_turn_speed = 0.18
-        self.approach_speed = 0.35
+        self.approach_speed = 0.05
         self.approach_steer_gain = 0.8
         self.approach_stop_width_fraction = 0.65
         self.approach_stop_frames_required = 3
@@ -131,8 +134,8 @@ class CapstoneRobot(object):
         if self.preview_server is None or frame is None:
             return
 
-        if color_format == "rgb":
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        # if color_format == "rgb":
+        #     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
         self.preview_server.update(resize_preview(frame, self.preview_width))
 
@@ -193,7 +196,8 @@ if __name__ == "__main__":
     # robot.run_robot()
     robot = CapstoneRobot()
     try:
-        # robot.search_for_pole()
-        robot.align_to_bell()
+        robot.search_for_pole()
+        # robot.state = 'aligning_bell'
+        # robot.align_to_bell()
     finally:
         robot.close()
