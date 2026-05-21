@@ -14,6 +14,7 @@ The robot can then strike the bell when it is in frame using an arm controlled b
 '''
 
 import time
+import cv2
 from transitions import Machine
 from gpiozero import Robot, Servo
 # import cv2 # For your Camera Module 3
@@ -62,6 +63,10 @@ class CapstoneRobot(object):
         )
         self.ai_labels = load_labels(LABELS_PATH)
         self.pole_bell_tracker = PoleBellTracker()
+        self.preview_width = 640
+        self.preview_server = MjpegPreview(host="0.0.0.0", port=1234, jpeg_quality=75)
+        self.preview_server.start()
+        print("Preview stream: http://<RPI_IP_ADDRESS>:1234")
 
         self.pole_conf_threshold = 0.5
         self.pole_center_deadband_px = 35
@@ -122,6 +127,20 @@ class CapstoneRobot(object):
     def opposite_direction(self, direction):
         return "left" if direction == "right" else "right"
 
+    def update_preview(self, frame, color_format="rgb"):
+        if self.preview_server is None or frame is None:
+            return
+
+        if color_format == "rgb":
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+
+        self.preview_server.update(resize_preview(frame, self.preview_width))
+
+    def close(self):
+        if self.preview_server is not None:
+            self.preview_server.stop()
+            self.preview_server = None
+
     def search_for_pole(self):
         searching_pole.run(self)
 
@@ -144,31 +163,37 @@ class CapstoneRobot(object):
         aligning_bell.run(self)
 
     def run_robot(self):
-        while self.state != 'done':
-            
-            if self.state == 'searching_pole':
-                print("[STATE] Searching for the pole...")
-                self.search_for_pole()
+        try:
+            while self.state != 'done':
+                
+                if self.state == 'searching_pole':
+                    print("[STATE] Searching for the pole...")
+                    self.search_for_pole()
 
-            elif self.state == 'approaching_pole':
-                print("[STATE] Approaching pole...")
-                self.approach_pole()
+                elif self.state == 'approaching_pole':
+                    print("[STATE] Approaching pole...")
+                    self.approach_pole()
 
-            elif self.state == 'aligning_bell':
-                print("[STATE] Aligning to bell...")
-                self.align_to_bell()
+                elif self.state == 'aligning_bell':
+                    print("[STATE] Aligning to bell...")
+                    self.align_to_bell()
 
-            elif self.state == 'climbing_pole':
-                climbing_pole.run(self)
+                elif self.state == 'climbing_pole':
+                    climbing_pole.run(self)
 
-            elif self.state == 'striking_bell':
-                striking_bell.run(self)
+                elif self.state == 'striking_bell':
+                    striking_bell.run(self)
 
-        print("[INFO] Robot execution successfully completed.")
+            print("[INFO] Robot execution successfully completed.")
+        finally:
+            self.close()
 
 if __name__ == "__main__":
     # robot = CapstoneRobot()
     # robot.run_robot()
     robot = CapstoneRobot()
-    # robot.search_for_pole()
-    robot.align_to_bell()
+    try:
+        # robot.search_for_pole()
+        robot.align_to_bell()
+    finally:
+        robot.close()

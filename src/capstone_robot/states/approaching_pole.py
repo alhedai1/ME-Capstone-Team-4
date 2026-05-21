@@ -1,5 +1,18 @@
 import time
 
+import cv2
+
+
+def update_preview(robot, frame, pole, status):
+    vis = frame.copy()
+    if pole is not None:
+        x, y, w, h = pole.box
+        cv2.rectangle(vis, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.circle(vis, (int(x + w / 2), int(y + h / 2)), 4, (0, 255, 0), -1)
+
+    cv2.putText(vis, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    robot.update_preview(vis)
+
 
 def run(robot):
     close_frames = 0
@@ -17,6 +30,7 @@ def run(robot):
             missed_frames += 1
             close_frames = 0
             print(f"[APPROACH] Pole lost ({missed_frames}/{robot.approach_missed_frame_limit})")
+            update_preview(robot, frame, None, f"APPROACH: LOST {missed_frames}")
 
             if missed_frames >= robot.approach_missed_frame_limit:
                 robot.motors.right(robot.search_turn_speed)
@@ -41,6 +55,7 @@ def run(robot):
                 f"[APPROACH] Close to pole ({close_frames}/{robot.approach_stop_frames_required}), "
                 f"width={width_fraction:.2f}, error_x={error_x:.1f}px"
             )
+            update_preview(robot, frame, pole, f"APPROACH: CLOSE width={width_fraction:.2f}")
 
             if close_frames >= robot.approach_stop_frames_required:
                 robot.pole_reached()
@@ -60,4 +75,5 @@ def run(robot):
             f"[APPROACH] width={width_fraction:.2f}, error_x={error_x:.1f}px, "
             f"left={left_speed:.2f}, right={right_speed:.2f}, conf={pole.confidence:.2f}"
         )
+        update_preview(robot, frame, pole, f"APPROACH: width={width_fraction:.2f} error={error_x:.1f}")
         time.sleep(0.05)

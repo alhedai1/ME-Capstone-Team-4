@@ -53,15 +53,28 @@ def wait_for_bell(robot, required_frames=3):
         if bell is None:
             seen_frames = 0
             print("[STRIKE] Waiting for bell")
+            update_preview(robot, frame, None, "STRIKE: WAITING FOR BELL")
         else:
             seen_frames += 1
             print(f"[STRIKE] Bell detected ({seen_frames}/{required_frames})")
+            update_preview(robot, frame, bell, f"STRIKE: BELL {seen_frames}/{required_frames}")
             if seen_frames >= required_frames:
                 return True
 
         time.sleep(0.05)
 
     return False
+
+
+def update_preview(robot, frame, bell, status):
+    vis = frame.copy()
+    if bell is not None:
+        x, y, w, h, area = bell
+        cv2.rectangle(vis, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.putText(vis, f"{int(area)}px", (x, max(25, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+    cv2.putText(vis, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+    robot.update_preview(vis)
 
 
 def strike_once(robot):

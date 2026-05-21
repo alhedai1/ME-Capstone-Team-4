@@ -3,13 +3,48 @@ import time
 import cv2
 
 
+def draw_line(frame, line, color=(0, 255, 0), thickness=2):
+    vx, vy, x0, y0 = line
+    t = 1000
+    x1 = int(x0 - vx * t)
+    y1 = int(y0 - vy * t)
+    x2 = int(x0 + vx * t)
+    y2 = int(y0 + vy * t)
+    cv2.line(frame, (x1, y1), (x2, y2), color, thickness)
+
+
+def update_alignment_preview(robot, frame, alignment, status):
+    if frame is None:
+        return
+
+    vis = frame.copy()
+    if alignment is not None:
+        draw_line(vis, alignment.pole_line)
+        bx, by, br = alignment.bell
+        cv2.circle(vis, (bx, by), br, (0, 0, 255), 2)
+
+    cv2.putText(vis, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    robot.update_preview(vis)
+
+
+def update_front_preview(robot, frame, pole, status):
+    vis = frame.copy()
+    if pole is not None:
+        x, y, w, h = pole.box
+        cv2.rectangle(vis, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        cv2.circle(vis, (int(x + w / 2), int(y + h / 2)), 4, (0, 255, 0), -1)
+
+    cv2.putText(vis, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    robot.update_preview(vis)
+
+
 def read_upward_alignment(robot):
     ok, frame = robot.pi_camera.read()
     if not ok or frame is None:
-        return None
+        return None, None
 
     frame = cv2.rotate(frame, cv2.ROTATE_180)
-    return robot.pole_bell_tracker.detect(frame)
+    return frame, robot.pole_bell_tracker.detect(frame)
 
 
 def wait_for_bell_side(robot):
@@ -17,12 +52,13 @@ def wait_for_bell_side(robot):
     aligned_frames = 0
 
     while robot.state == "aligning_bell":
-        alignment = read_upward_alignment(robot)
+        frame, alignment = read_upward_alignment(robot)
         if alignment is None:
             missed_frames += 1
             aligned_frames = 0
             robot.motors.stop()
             print(f"[ALIGN] Need pole and bell ({missed_frames}/{robot.alignment_missed_frame_limit})")
+            update_alignment_preview(robot, frame, None, f"ALIGN: NEED POLE/BELL {missed_frames}")
             time.sleep(0.05)
             continue
 
@@ -33,6 +69,7 @@ def wait_for_bell_side(robot):
                 f"[ALIGN] Already aligned ({aligned_frames}/{robot.alignment_stable_frames_required}), "
                 f"error={alignment.error_px:.1f}px"
             )
+            update_alignment_preview(robot, frame, alignment, f"ALIGN: OK {aligned_frames}")
 
             if aligned_frames >= robot.alignment_stable_frames_required:
                 return "aligned"
@@ -41,6 +78,7 @@ def wait_for_bell_side(robot):
             continue
 
         print(f"[ALIGN] Bell is on the {alignment.side}, error={alignment.error_px:.1f}px")
+        update_alignment_preview(robot, frame, alignment, f"ALIGN: {alignment.side} error={alignment.error_px:.1f}")
         return alignment.side
 
     return None
@@ -51,12 +89,13 @@ def orbit_until_bell_aligned(robot):
     missed_frames = 0
 
     while robot.state == "aligning_bell":
-        alignment = read_upward_alignment(robot)
+        frame, alignment = read_upward_alignment(robot)
         if alignment is None:
             missed_frames += 1
             stable_frames = 0
             robot.motors.stop()
             print(f"[ALIGN] Lost pole/bell while orbiting ({missed_frames}/{robot.alignment_missed_frame_limit})")
+            update_alignment_preview(robot, frame, None, f"ORBIT: LOST {missed_frames}")
             time.sleep(0.05)
             continue
 
@@ -70,6 +109,7 @@ def orbit_until_bell_aligned(robot):
                 f"[ALIGN] Bell aligned ({stable_frames}/{robot.alignment_stable_frames_required}), "
                 f"error={error:.1f}px"
             )
+            update_alignment_preview(robot, frame, alignment, f"ORBIT: ALIGNED {stable_frames}")
 
             if stable_frames >= robot.alignment_stable_frames_required:
                 return True
@@ -77,6 +117,7 @@ def orbit_until_bell_aligned(robot):
             stable_frames = 0
             robot.motors.forward(robot.orbit_speed)
             print(f"[ALIGN] Orbiting, side={alignment.side}, error={error:.1f}px")
+            update_alignment_preview(robot, frame, alignment, f"ORBIT: error={error:.1f}")
 
         time.sleep(0.05)
 
@@ -97,6 +138,7 @@ def center_front_pole_for_climb(robot):
         if pole is None:
             stable_frames = 0
             print("[ALIGN] Front pole not detected; rotating right slowly")
+            update_front_preview(robot, frame, None, "FRONT: NO POLE")
             robot.motors.right(robot.search_turn_speed)
             time.sleep(0.05)
             continue
@@ -111,6 +153,7 @@ def center_front_pole_for_climb(robot):
                 f"[ALIGN] Front pole centered ({stable_frames}/{robot.pole_stable_frames_required}), "
                 f"error_x={error_x:.1f}px"
             )
+            update_front_preview(robot, frame, pole, f"FRONT: CENTERED {stable_frames}")
 
             if stable_frames >= robot.pole_stable_frames_required:
                 return True
@@ -119,9 +162,11 @@ def center_front_pole_for_climb(robot):
             if error_x < 0:
                 robot.motors.left(robot.center_turn_speed)
                 print(f"[ALIGN] Front pole left of center, error_x={error_x:.1f}px")
+                update_front_preview(robot, frame, pole, f"FRONT: LEFT {error_x:.1f}")
             else:
                 robot.motors.right(robot.center_turn_speed)
                 print(f"[ALIGN] Front pole right of center, error_x={error_x:.1f}px")
+                update_front_preview(robot, frame, pole, f"FRONT: RIGHT {error_x:.1f}")
 
         time.sleep(0.05)
 
