@@ -54,7 +54,7 @@ class CapstoneRobot(object):
         self.right_rpwm = 'BOARD29'
         self.right_lpwm = 'BOARD31'
         self.motors = Robot(left=(self.left_lpwm, self.left_rpwm), right=(self.right_lpwm, self.right_rpwm))
-        # self.servo = Servo(11)
+        self.servo = Servo('BOARD36')
         self.pi_camera = PiCamera(width=640, height=480, fps=30)
         self.ai_camera = AiCamera(
             model_path=MODEL_PATH,
@@ -71,6 +71,7 @@ class CapstoneRobot(object):
         self.preview_server.start()
         print("Preview stream: http://<RPI_IP_ADDRESS>:1234")
 
+        self.search_startup_wait_seconds = 1.0
         self.pole_conf_threshold = 0.5
         self.pole_center_deadband_px = 35
         self.pole_stable_frames_required = 5
@@ -78,6 +79,9 @@ class CapstoneRobot(object):
         self.pole_smooth_alpha = 0.75
         self.search_turn_speed = 0.05
         self.center_turn_speed = 0.05
+
+        self.approach_hold_frame_limit = 3
+        # self.pole_smooth_alpha = 0.75
         self.approach_speed = 0.05
         self.approach_steer_gain = 0.8
         self.approach_stop_width_fraction = 0.65

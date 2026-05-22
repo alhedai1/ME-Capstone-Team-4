@@ -43,7 +43,7 @@ def run(robot):
             continue
 
         if pole is None:
-            if time.time() - search_started_at < startup_wait_seconds:
+            if time.time() - search_started_at < robot.search_startup_wait_seconds:
                 robot.motors.stop()
                 print(f"[SEARCH] Waiting for initial pole detection - Time: {time.time() -search_started_at}")
                 update_preview(robot, frame, None, "SEARCH: STARTUP WAIT")
