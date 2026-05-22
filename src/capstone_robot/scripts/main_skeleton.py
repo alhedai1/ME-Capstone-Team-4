@@ -16,7 +16,7 @@ The robot can then strike the bell when it is in frame using an arm controlled b
 import time
 import cv2
 from transitions import Machine
-from gpiozero import Robot, Servo
+from gpiozero import Robot, Servo, AngularServo
 # import cv2 # For your Camera Module 3
 # from picamera2 import Picamera2 # For your AI Camera
 from capstone_robot.states import approaching_pole, aligning_bell, climbing_pole, searching_pole, striking_bell
@@ -49,11 +49,13 @@ class CapstoneRobot(object):
 
     def __init__(self):
         # Hardware Setup (Adjust GPIO pins based on your hardware)
-        self.left_rpwm = 'BOARD36'
-        self.left_lpwm = 'BOARD37'
-        self.right_rpwm = 'BOARD29'
-        self.right_lpwm = 'BOARD31'
+        self.left_rpwm = 'BOARD32'
+        self.left_lpwm = 'BOARD33'
+        self.right_rpwm = 'BOARD12'
+        self.right_lpwm = 'BOARD35'
         self.motors = Robot(left=(self.left_lpwm, self.left_rpwm), right=(self.right_lpwm, self.right_rpwm))
+        # self.servo = AngularServo('BOARD36', min_angle=-30, max_angle=30, 
+        #              min_pulse_width=0.0005, max_pulse_width=0.0025)
         self.servo = Servo('BOARD36')
         self.pi_camera = PiCamera(width=640, height=480, fps=30)
         self.ai_camera = AiCamera(
@@ -202,8 +204,23 @@ if __name__ == "__main__":
     # robot.run_robot()
     robot = CapstoneRobot()
     try:
-        robot.search_for_pole()
+        #robot.search_for_pole()
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()
+        robot.servo.min()  # Move to -1
+        print("min")
+        # time.sleep(1)
+        # robot.servo.angle = -30
+        time.sleep(0.1)
+        robot.servo.mid()
+        print("mid")
+        # robot.servo.angle =   # Move to 0
+        time.sleep(0.1)
+        # robot.servo.angle = 40
+        # time.sleep(1)
+        robot.servo.max()  # Move to 1
+        print("max")
+        time.sleep(0.1)
+        # time.sleep(1)
     finally:
         robot.close()
