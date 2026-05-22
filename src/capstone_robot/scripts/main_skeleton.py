@@ -204,23 +204,23 @@ if __name__ == "__main__":
     # robot.run_robot()
     robot = CapstoneRobot()
     try:
-        #robot.search_for_pole()
+        robot.search_for_pole()
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()
-        robot.servo.min()  # Move to -1
-        print("min")
-        # time.sleep(1)
-        # robot.servo.angle = -30
-        time.sleep(0.1)
-        robot.servo.mid()
-        print("mid")
-        # robot.servo.angle =   # Move to 0
-        time.sleep(0.1)
-        # robot.servo.angle = 40
-        # time.sleep(1)
-        robot.servo.max()  # Move to 1
-        print("max")
-        time.sleep(0.1)
-        # time.sleep(1)
+        # robot.servo.min()  # Move to -1
+        # print("min")
+        # # time.sleep(1)
+        # # robot.servo.angle = -30
+        # time.sleep(0.1)
+        # robot.servo.mid()
+        # print("mid")
+        # # robot.servo.angle =   # Move to 0
+        # time.sleep(0.1)
+        # # robot.servo.angle = 40
+        # # time.sleep(1)
+        # robot.servo.max()  # Move to 1
+        # print("max")
+        # time.sleep(0.1)
+        # # time.sleep(1)
     finally:
         robot.close()
