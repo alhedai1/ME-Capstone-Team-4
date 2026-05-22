@@ -49,10 +49,10 @@ class CapstoneRobot(object):
 
     def __init__(self):
         # Hardware Setup (Adjust GPIO pins based on your hardware)
-        self.left_rpwm = 'BOARD32'
-        self.left_lpwm = 'BOARD33'
-        self.right_rpwm = 'BOARD12'
-        self.right_lpwm = 'BOARD35'
+        self.left_rpwm = 'BOARD33'
+        self.left_lpwm = 'BOARD32'
+        self.right_rpwm = 'BOARD35'
+        self.right_lpwm = 'BOARD12'
         self.motors = Robot(left=(self.left_lpwm, self.left_rpwm), right=(self.right_lpwm, self.right_rpwm))
         # self.servo = AngularServo('BOARD36', min_angle=-30, max_angle=30, 
         #              min_pulse_width=0.0005, max_pulse_width=0.0025)
@@ -79,8 +79,8 @@ class CapstoneRobot(object):
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 0.75
-        self.search_turn_speed = 0.05
-        self.center_turn_speed = 0.05
+        self.search_turn_speed = 0.25
+        self.center_turn_speed = 0.25
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
