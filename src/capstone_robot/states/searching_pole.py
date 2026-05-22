@@ -30,6 +30,9 @@ def run(robot):
     last_pole = None
     smoothed_box = None
 
+    startup_wait_seconds = 1.0
+    search_started_at = time.time()
+
     while robot.state == "searching_pole":
         frame, pole = robot.detect_pole()
         if frame is None:
@@ -39,6 +42,13 @@ def run(robot):
             continue
 
         if pole is None:
+            if time.time() - search_started_at < startup_wait_seconds:
+                robot.motors.stop()
+                print(f"[SEARCH] Waiting for initial pole detection - Time: {time.time() -search_started_at}")
+                update_preview(robot, frame, None, "SEARCH: STARTUP WAIT")
+                time.sleep(0.05)
+                continue
+
             missed_frames += 1
 
             if last_pole is not None and missed_frames <= robot.search_missed_frame_limit:
