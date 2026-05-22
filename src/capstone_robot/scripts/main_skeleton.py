@@ -84,9 +84,9 @@ class CapstoneRobot(object):
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
-        self.approach_speed = 0.05
-        self.approach_steer_gain = 0.8
-        self.approach_stop_width_fraction = 0.65
+        self.approach_speed = 0.2
+        self.approach_steer_gain = 0.3
+        self.approach_stop_width_fraction = 0.14
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
         self.align_turn_speed = 0.35
@@ -205,6 +205,7 @@ if __name__ == "__main__":
     robot = CapstoneRobot()
     try:
         # robot.search_for_pole()
+        robot.state = "approaching_pole"
         robot.approach_pole()
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()
