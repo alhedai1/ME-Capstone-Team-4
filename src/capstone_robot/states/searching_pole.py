@@ -29,6 +29,7 @@ def run(robot):
     missed_frames = 0
     last_pole = None
     smoothed_box = None
+    last_motor_action = None
 
     startup_wait_seconds = 1.0
     search_started_at = time.time()
@@ -57,7 +58,13 @@ def run(robot):
                     "holding position"
                 )
                 update_preview(robot, frame, last_pole, f"SEARCH: HOLD {missed_frames}")
-                robot.motors.stop()
+                # robot.motors.stop()
+                if last_motor_action == "left":
+                    robot.motors.left(robot.center_turn_speed)
+                elif last_motor_action == "right":
+                    robot.motors.right(robot.center_turn_speed)
+                else:
+                    robot.motors.stop()
                 time.sleep(0.05)
                 continue
 
@@ -82,6 +89,7 @@ def run(robot):
 
         if abs(error_x) <= robot.pole_center_deadband_px:
             stable_frames += 1
+            last_motor_action = "stop"
             robot.motors.stop()
             print(
                 f"[SEARCH] Pole centered ({stable_frames}/{robot.pole_stable_frames_required}), "
@@ -97,10 +105,12 @@ def run(robot):
             if error_x < 0:
                 print(f"[SEARCH] Pole left of center, error_x={error_x:.1f}px")
                 update_preview(robot, frame, pole, f"SEARCH: LEFT error={error_x:.1f}")
+                last_motor_action = "left"
                 robot.motors.left(robot.center_turn_speed)
             else:
                 print(f"[SEARCH] Pole right of center, error_x={error_x:.1f}px")
                 update_preview(robot, frame, pole, f"SEARCH: RIGHT error={error_x:.1f}")
+                last_motor_action = "right"
                 robot.motors.right(robot.center_turn_speed)
 
         time.sleep(0.05)

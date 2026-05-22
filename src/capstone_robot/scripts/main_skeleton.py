@@ -112,7 +112,7 @@ class CapstoneRobot(object):
         )
         return frame, choose_pole(detections)
 
-    def drive_tank(self, left_speed, right_speed):
+    def drive(self, left_speed, right_speed):
         left_speed = max(-1.0, min(1.0, left_speed))
         right_speed = max(-1.0, min(1.0, right_speed))
         self.motors.value = (left_speed, right_speed)
