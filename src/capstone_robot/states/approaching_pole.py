@@ -49,7 +49,6 @@ def run(robot):
 
         if pole is None:
             missed_frames += 1
-            close_frames = 0
 
             if last_pole is not None and missed_frames <= robot.approach_hold_frame_limit:
                 print(
@@ -61,6 +60,7 @@ def run(robot):
                 time.sleep(0.05)
                 continue
 
+            close_frames = 0
             print(f"[APPROACH] Pole lost ({missed_frames}/{robot.approach_missed_frame_limit})")
             update_preview(robot, frame, None, f"APPROACH: LOST {missed_frames}")
 
