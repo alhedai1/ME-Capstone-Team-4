@@ -14,9 +14,30 @@ def update_preview(robot, frame, pole, status):
     robot.update_preview(vis)
 
 
+def smooth_box(old_box, new_box, alpha):
+    if old_box is None:
+        return new_box
+
+    return tuple(
+        int(alpha * new + (1.0 - alpha) * old)
+        for old, new in zip(old_box, new_box)
+    )
+
+
+# def drive_robot(robot, left_speed, right_speed):
+#     if hasattr(robot, "drive_tank"):
+#         robot.drive_tank(left_speed, right_speed)
+#     else:
+#         robot.drive(left_speed, right_speed)
+
+
 def run(robot):
     close_frames = 0
     missed_frames = 0
+    last_pole = None
+    smoothed_box = None
+    last_left_speed = 0.0
+    last_right_speed = 0.0
 
     while robot.state == "approaching_pole":
         frame, pole = robot.detect_pole()
@@ -29,6 +50,17 @@ def run(robot):
         if pole is None:
             missed_frames += 1
             close_frames = 0
+
+            if last_pole is not None and missed_frames <= robot.approach_hold_frame_limit:
+                print(
+                    f"[APPROACH] Pole briefly lost ({missed_frames}/{robot.approach_hold_frame_limit}); "
+                    "holding last drive command"
+                )
+                update_preview(robot, frame, last_pole, f"APPROACH: HOLD {missed_frames}")
+                robot.drive(last_left_speed, last_right_speed)
+                time.sleep(0.05)
+                continue
+
             print(f"[APPROACH] Pole lost ({missed_frames}/{robot.approach_missed_frame_limit})")
             update_preview(robot, frame, None, f"APPROACH: LOST {missed_frames}")
 
@@ -37,10 +69,20 @@ def run(robot):
             else:
                 robot.motors.stop()
 
+            if missed_frames >= robot.approach_missed_frame_limit:
+                last_pole = None
+                smoothed_box = None
+                last_left_speed = 0.0
+                last_right_speed = 0.0
+
             time.sleep(0.05)
             continue
 
         missed_frames = 0
+        smoothed_box = smooth_box(smoothed_box, pole.box, robot.pole_smooth_alpha)
+        pole.box = smoothed_box
+        last_pole = pole
+
         x, y, w, h = pole.box
         frame_width = frame.shape[1]
         pole_center_x = x + w / 2.0
@@ -50,6 +92,8 @@ def run(robot):
 
         if width_fraction >= robot.approach_stop_width_fraction:
             close_frames += 1
+            last_left_speed = 0.0
+            last_right_speed = 0.0
             robot.motors.stop()
             print(
                 f"[APPROACH] Close to pole ({close_frames}/{robot.approach_stop_frames_required}), "
@@ -70,7 +114,9 @@ def run(robot):
         left_speed = robot.approach_speed + steering
         right_speed = robot.approach_speed - steering
 
-        robot.drive_tank(left_speed, right_speed)
+        last_left_speed = left_speed
+        last_right_speed = right_speed
+        robot.drive(left_speed, right_speed)
         print(
             f"[APPROACH] width={width_fraction:.2f}, error_x={error_x:.1f}px, "
             f"left={left_speed:.2f}, right={right_speed:.2f}, conf={pole.confidence:.2f}"

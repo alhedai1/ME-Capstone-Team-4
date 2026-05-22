@@ -31,7 +31,6 @@ def run(robot):
     smoothed_box = None
     last_motor_action = None
 
-    startup_wait_seconds = 1.0
     search_started_at = time.time()
 
     while robot.state == "searching_pole":
