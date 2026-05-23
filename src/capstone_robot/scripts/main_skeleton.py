@@ -109,6 +109,12 @@ class CapstoneRobot(object):
         self.alignment_error_threshold_px = 20
         self.alignment_stable_frames_required = 4
         self.alignment_missed_frame_limit = 15
+        self.climb_center_timeout_seconds = 2.0
+        self.climb_attach_speed = 0.25
+        self.climb_attach_seconds = 0.5
+        self.climb_speed = 1.0
+        self.climb_bell_stable_frames_required = 3
+        self.climb_max_seconds = 20.0
         
         # Initialize Finite State Machine
         self.machine = Machine(model=self, states=CapstoneRobot.states, initial='searching_pole')
@@ -118,6 +124,7 @@ class CapstoneRobot(object):
         self.machine.add_transition(trigger='pole_reached', source='approaching_pole', dest='aligning_bell')
         self.machine.add_transition(trigger='aligned', source='aligning_bell', dest='climbing_pole')
         self.machine.add_transition(trigger='bell_detected', source='climbing_pole', dest='striking_bell')
+        self.machine.add_transition(trigger='climb_failed', source='climbing_pole', dest='done')
         self.machine.add_transition(trigger='mission_complete', source='striking_bell', dest='done')
 
     def detect_pole(self):
@@ -237,6 +244,6 @@ if __name__ == "__main__":
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()
         robot.state = "climbing_pole"
-        robot.climb
+        robot.climb_pole()
     finally:
         robot.close()
