@@ -14,18 +14,18 @@ for i in range(3):
     # servo.min()
     servo.max()
     print("forward")
-    sleep(2)
+    sleep(1.2)
     # servo.value = 0.0 # Stop
     # servo.max()
-    servo.mid()
-    print("stop")
-    sleep(2)
+    # servo.mid()
+    # print("stop")
+    # sleep(2)
     servo.min()
     print("backward")
-    sleep(2)
-    servo.mid()
-    print("stop")
-    sleep(2)
+    sleep(5)
+    # servo.mid()
+    # print("stop")
+    # sleep(2)
 servo.value = None
 
 

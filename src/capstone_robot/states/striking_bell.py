@@ -78,10 +78,10 @@ def update_preview(robot, frame, bell, status):
 
 
 def strike_once(robot):
-    robot.servo.min()
-    time.sleep(0.5)
     robot.servo.max()
-    time.sleep(0.5)
+    time.sleep(1.2)
+    robot.servo.min()
+    # time.sleep(0.5)
 
 
 def run(robot):
