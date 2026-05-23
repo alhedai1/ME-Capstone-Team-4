@@ -14,9 +14,12 @@ The robot can then strike the bell when it is in frame using an arm controlled b
 '''
 
 import time
+from time import sleep
 import cv2
 from transitions import Machine
 from gpiozero import Robot, Servo, AngularServo
+from gpiozero import Device
+from gpiozero.pins.pigpio import PiGPIOFactory
 # import cv2 # For your Camera Module 3
 # from picamera2 import Picamera2 # For your AI Camera
 from capstone_robot.states import approaching_pole, aligning_bell, climbing_pole, searching_pole, striking_bell
@@ -28,6 +31,7 @@ REPO_ROOT = find_repo_root(__file__)
 MODEL_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx/network.rpk"
 LABELS_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx/labels.txt"
 
+# Device.pin_factory = PiGPIOFactory()
 
 def load_labels(path):
     if path is None or not path.exists():
@@ -54,9 +58,19 @@ class CapstoneRobot(object):
         self.right_rpwm = 'BOARD35'
         self.right_lpwm = 'BOARD12'
         self.motors = Robot(left=(self.left_lpwm, self.left_rpwm), right=(self.right_lpwm, self.right_rpwm))
-        # self.servo = AngularServo('BOARD36', min_angle=-30, max_angle=30, 
-        #              min_pulse_width=0.0005, max_pulse_width=0.0025)
-        self.servo = Servo('BOARD36')
+        # self.servo = AngularServo(
+        #     16,
+        #     min_angle=-60,
+        #     max_angle=60,
+        #     min_pulse_width=0.001,
+        #     max_pulse_width=0.002,
+        #     frame_width=0.02
+        # )
+        self.servo = Servo(16) #BOARD36
+        self.servo.value = None
+        #     min_pulse_width=0.001,
+        #     max_pulse_width=0.002,
+        #     frame_width=0.02)
         self.pi_camera = PiCamera(width=640, height=480, fps=30)
         self.ai_camera = AiCamera(
             model_path=MODEL_PATH,
@@ -75,17 +89,17 @@ class CapstoneRobot(object):
 
         self.search_startup_wait_seconds = 1.0
         self.pole_conf_threshold = 0.5
-        self.pole_center_deadband_px = 35
+        self.pole_center_deadband_px = 20
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 0.75
-        self.search_turn_speed = 0.25
-        self.center_turn_speed = 0.25
+        self.search_turn_speed = 0.2
+        self.center_turn_speed = 0.2
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
-        self.approach_speed = 0.2
-        self.approach_steer_gain = 0.3
+        self.approach_speed = 0.1
+        self.approach_steer_gain = 0.1
         self.approach_stop_width_fraction = 0.14
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
@@ -131,9 +145,9 @@ class CapstoneRobot(object):
         else:
             self.motors.right(speed)
 
-        time.sleep(seconds)
+        sleep(seconds)
         self.motors.stop()
-        time.sleep(0.2)
+        sleep(0.2)
 
     def opposite_direction(self, direction):
         return "left" if direction == "right" else "right"
@@ -151,6 +165,8 @@ class CapstoneRobot(object):
         if self.preview_server is not None:
             self.preview_server.stop()
             self.preview_server = None
+        self.servo.value = None
+        self.servo.detach()
 
     def search_for_pole(self):
         searching_pole.run(self)
@@ -172,6 +188,12 @@ class CapstoneRobot(object):
 
     def align_to_bell(self):
         aligning_bell.run(self)
+    
+    def climb_pole(self):
+        climbing_pole.run(self)
+    
+    def strike_bell(self):
+        striking_bell.run(self)
 
     def run_robot(self):
         try:
@@ -190,10 +212,12 @@ class CapstoneRobot(object):
                     self.align_to_bell()
 
                 elif self.state == 'climbing_pole':
-                    climbing_pole.run(self)
+                    print("[STATE] Climbing pole...")
+                    self.climb_pole()
 
                 elif self.state == 'striking_bell':
-                    striking_bell.run(self)
+                    print("[STATE] Striking bell...")
+                    self.strike_bell()
 
             print("[INFO] Robot execution successfully completed.")
         finally:
@@ -204,25 +228,15 @@ if __name__ == "__main__":
     # robot.run_robot()
     robot = CapstoneRobot()
     try:
+        # print(robot.state)
         # robot.search_for_pole()
-        robot.state = "approaching_pole"
-        robot.approach_pole()
+        # print(robot.state)
+        # robot.state = "approaching_pole"
+        # robot.approach_pole()
+        # robot.run_robot()
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()
-        # robot.servo.min()  # Move to -1
-        # print("min")
-        # # time.sleep(1)
-        # # robot.servo.angle = -30
-        # time.sleep(1.2)
-        # # robot.servo.mid()
-        # print("mid")
-        # # robot.servo.angle =   # Move to 0
-        # # time.sleep(0.1)
-        # # robot.servo.angle = 40
-        # # time.sleep(1)
-        # robot.servo.max()  # Move to 1
-        # print("max")
-        # # time.sleep(0.1)
-        # # time.sleep(1)
+        robot.state = "climbing_pole"
+        robot.climb
     finally:
         robot.close()
