@@ -13,19 +13,26 @@ from capstone_robot.utils import *
 
 REPO_ROOT = find_repo_root(__file__)
 IMG_PATH = "../data/extracted_frames/may15/test1_trim/frame_000000.jpg"
-VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may15/trimmed/test1_trim.mp4"
+VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/test_videos/aligncenter.mp4"
 IMG_FOLDER = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim"
 
 img_paths = [img_path for img_path in IMG_FOLDER.iterdir()]
 # img_paths = [REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim/frame_001170.jpg"]
 
 
-# bright regions (hit by sunlight)
+# # bright regions (hit by sunlight)
+# LOWER_BRIGHT = np.array([0, 0, 200])
+# UPPER_BRIGHT = np.array([50, 50, 255])
+# # dark regions
+# LOWER_DARK = np.array([100, 0, 0])
+# UPPER_DARK = np.array([200, 100, 80])
+
+
 LOWER_BRIGHT = np.array([0, 0, 200])
-UPPER_BRIGHT = np.array([50, 50, 255])
+UPPER_BRIGHT = np.array([180, 100, 255])
 # dark regions
-LOWER_DARK = np.array([100, 0, 0])
-UPPER_DARK = np.array([200, 100, 80])
+LOWER_DARK = np.array([0, 0, 0])
+UPPER_DARK = np.array([180, 100, 50])
 
 def show(figure, img, title="", cmap=None):
     if img.ndim == 2:
@@ -135,7 +142,7 @@ def detect_bell(frame):
         param1=300,
         param2=20,
         minRadius=10,
-        maxRadius=20
+        maxRadius=30
     )
     # circles = cv2.HoughCircles(blurred, cv2.HOUGH_GRADIENT, dp=1, minDist=20, param1=150, param2=20, minRadius=0, maxRadius=30)
 

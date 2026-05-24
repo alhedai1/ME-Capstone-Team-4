@@ -5,9 +5,9 @@ import numpy as np
 
 
 LOWER_BRIGHT = np.array([0, 0, 200])
-UPPER_BRIGHT = np.array([50, 50, 255])
-LOWER_DARK = np.array([100, 0, 0])
-UPPER_DARK = np.array([200, 100, 80])
+UPPER_BRIGHT = np.array([180, 100, 255])
+LOWER_DARK = np.array([00, 0, 0])
+UPPER_DARK = np.array([180, 100, 50])
 
 
 @dataclass
@@ -226,7 +226,7 @@ def detect_bell(frame, color_format="rgb"):
         param1=300,
         param2=20,
         minRadius=10,
-        maxRadius=20,
+        maxRadius=30,
     )
 
     if circles is None:

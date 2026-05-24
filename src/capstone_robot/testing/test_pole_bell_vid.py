@@ -8,7 +8,7 @@ from capstone_robot.vision.pole_bell import PoleBellTracker
 
 REPO_ROOT = find_repo_root(__file__)
 IMG_PATH = "../data/extracted_frames/may15/test1_trim/frame_000000.jpg"
-VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may15/trimmed/test1_trim.mp4"
+VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/test_videos/aligncenter.mp4"
 IMG_FOLDER = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim"
 
 def draw_line(img, line, color=(0, 255, 0), thickness=2):
@@ -44,7 +44,7 @@ while True:
     alignment = tracker.detect(img)
     vis = img.copy()
     if alignment is not None:
-        # print(alignment.pole_line)
+        print(alignment.pole_line)
         vis = draw_line(vis, alignment.pole_line)
     cv2.imshow("vis", vis)
     cv2.waitKey(0)
