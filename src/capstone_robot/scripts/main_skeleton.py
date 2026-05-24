@@ -40,9 +40,18 @@ def load_labels(path):
     return [line.strip() for line in path.read_text().splitlines() if line.strip()]
 
 
-def choose_pole(detections, target_label="pole"):
+def choose_pole(detections, frame, target_label="pole"):
     if target_label:
-        poles = [det for det in detections if det.label.lower() == target_label.lower() and det]
+        # poles = [det for det in detections if det.label.lower() == target_label.lower()]
+        poles = []
+        for det in detections:
+            x, y, w, h = det.box
+            pole_center_x = x + w / 2.0
+            frame_width = frame.shape[1]
+            if det.label.lower() == target_label.lower():
+                if pole_center_x >= 0.2 * frame_width:
+                    if pole_center_x <= 0.8 * frame_width:
+                        poles.append(det)
         if poles:
             return max(poles, key=lambda det: det.confidence)
 
@@ -141,7 +150,7 @@ class CapstoneRobot(object):
             labels=self.ai_labels,
             threshold=self.pole_conf_threshold,
         )
-        return frame, choose_pole(detections)
+        return frame, choose_pole(detections, frame)
 
     def drive(self, left_speed, right_speed):
         left_speed = max(-1.0, min(1.0, left_speed))
