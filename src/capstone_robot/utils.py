@@ -42,6 +42,10 @@ class PiCamera:
             raise RuntimeError("Picamera2 is not installed. Install python3-picamera2 on the Raspberry Pi.") from exc
 
         self.picam2 = Picamera2(0)
+        # self.picam2.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 10.0})
+        # time.sleep(0.5)
+        # self.picam2.set_controls({"LensPosition": 0.0})
+        # time.sleep(0.5)
         self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         config = self.picam2.create_video_configuration(
             main={"size": (width, height), "format": "RGB888"},
