@@ -90,7 +90,7 @@ def main():
     parser.add_argument("--draw-all", action="store_true", help="Draw all detections, not only chosen pole")
     parser.add_argument("--preview-width", type=int, default=640, help="MJPEG preview width")
     parser.add_argument("--host", default="0.0.0.0", help="MJPEG preview host")
-    parser.add_argument("--port", type=int, default=1236, help="MJPEG preview port")
+    parser.add_argument("--port", type=int, default=1234, help="MJPEG preview port")
     parser.add_argument("--jpeg-quality", type=int, default=75, help="MJPEG preview JPEG quality")
     parser.add_argument("--no-preview", action="store_true", help="Disable MJPEG preview server")
     parser.add_argument("--show", action="store_true", help="Also show an OpenCV window if a desktop is available")
