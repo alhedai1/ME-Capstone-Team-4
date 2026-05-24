@@ -29,6 +29,9 @@ def update_bell_preview(robot, frame, bell, status):
 
 def center_front_pole(robot):
     stable_frames = 0
+    last_pole = None
+    missed_frames = 0
+    last_motor_action = "stop"
     started_at = time.time()
 
     while robot.state == "climbing_pole":
@@ -45,18 +48,42 @@ def center_front_pole(robot):
             continue
 
         if pole is None:
+            missed_frames += 1
+
+            if last_pole is not None and missed_frames <= robot.search_missed_frame_limit:
+                print(
+                    f"[CLIMB] Front pole briefly lost ({missed_frames}/{robot.search_missed_frame_limit}); "
+                    f"holding last action: {last_motor_action}"
+                )
+                update_front_preview(robot, frame, last_pole, f"CLIMB: HOLD {missed_frames}")
+
+                if last_motor_action == "left":
+                    robot.motors.left(robot.center_turn_speed)
+                elif last_motor_action == "right":
+                    robot.motors.right(robot.center_turn_speed)
+                else:
+                    robot.motors.stop()
+
+                time.sleep(0.05)
+                continue
+
             stable_frames = 0
+            last_pole = None
+            last_motor_action = "stop"
             robot.motors.stop()
             print("[CLIMB] Front pole not detected while centering")
             update_front_preview(robot, frame, None, "CLIMB: NO FRONT POLE")
             time.sleep(0.05)
             continue
-
+        
         x, y, w, h = pole.box
         error_x = (x + w / 2.0) - (frame.shape[1] / 2.0)
+        missed_frames = 0
+        last_pole = pole
 
         if abs(error_x) <= robot.pole_center_deadband_px:
             stable_frames += 1
+            last_motor_action = "stop"
             robot.motors.stop()
             print(
                 f"[CLIMB] Front pole centered ({stable_frames}/{robot.pole_stable_frames_required}), "
@@ -69,10 +96,12 @@ def center_front_pole(robot):
         else:
             stable_frames = 0
             if error_x < 0:
+                last_motor_action = "left"
                 robot.motors.left(robot.center_turn_speed)
                 print(f"[CLIMB] Front pole left of center, error_x={error_x:.1f}px")
                 update_front_preview(robot, frame, pole, f"CLIMB: LEFT {error_x:.1f}")
             else:
+                last_motor_action = "right"
                 robot.motors.right(robot.center_turn_speed)
                 print(f"[CLIMB] Front pole right of center, error_x={error_x:.1f}px")
                 update_front_preview(robot, frame, pole, f"CLIMB: RIGHT {error_x:.1f}")
@@ -141,7 +170,7 @@ def run(robot):
 
         print(f"[CLIMB] Climbing at speed={robot.climb_speed:.2f}")
         if climb_until_bell(robot):
-            robot.motors.stop()
+            robot.motors.stop() # run motors at ~0.5 to hold position after detecting bell
             robot.bell_detected()
         elif robot.state == "climbing_pole":
             robot.climb_failed()

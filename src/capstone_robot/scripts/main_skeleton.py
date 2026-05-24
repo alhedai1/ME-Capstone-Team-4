@@ -103,15 +103,17 @@ class CapstoneRobot(object):
         self.approach_stop_width_fraction = 0.14
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
+
         self.align_turn_speed = 0.35
         self.align_quarter_turn_seconds = 1.2
         self.orbit_speed = 0.25
         self.alignment_error_threshold_px = 20
         self.alignment_stable_frames_required = 4
         self.alignment_missed_frame_limit = 15
+
         self.climb_center_timeout_seconds = 2.0
         self.climb_attach_speed = 0.2
-        self.climb_attach_seconds = 5
+        self.climb_attach_seconds = 2
         self.climb_speed = 1.0
         self.climb_bell_stable_frames_required = 3
         self.climb_max_seconds = 20.0
