@@ -245,9 +245,9 @@ if __name__ == "__main__":
         # robot.state = "approaching_pole"
         # robot.approach_pole()
         # robot.run_robot()
-        # robot.state = 'aligning_bell'
-        # robot.align_to_bell()
-        robot.state = "climbing_pole"
-        robot.climb_pole()
+        robot.state = 'aligning_bell'
+        robot.align_to_bell()
+        # robot.state = "climbing_pole"
+        # robot.climb_pole()
     finally:
         robot.close()

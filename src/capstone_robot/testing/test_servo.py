@@ -9,7 +9,7 @@ from time import sleep
 servo = Servo(16)
 
 # Try testing your movements now:
-for i in range(3):
+for i in range(1):
     # servo.value = 0.10  # Forward
     # servo.min()
     servo.max()
