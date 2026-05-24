@@ -169,7 +169,8 @@ def run(robot):
 
         print(f"[CLIMB] Climbing at speed={robot.climb_speed:.2f}")
         if climb_until_bell(robot):
-            robot.motors.stop() # run motors at ~0.5 to hold position after detecting bell
+            # robot.motors.stop() # run motors at ~0.5 to hold position after detecting bell
+            robot.motors.forward(0.4)
             robot.bell_detected()
         elif robot.state == "climbing_pole":
             robot.climb_failed()
