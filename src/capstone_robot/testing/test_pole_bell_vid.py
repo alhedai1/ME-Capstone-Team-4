@@ -46,5 +46,6 @@ while True:
     if alignment is not None:
         print(alignment.pole_line)
         vis = draw_line(vis, alignment.pole_line)
+        vis = cv2.circle(vis, (alignment.bell[0], alignment.bell[1]), alignment.bell[2], (255, 0, 0))
     cv2.imshow("vis", vis)
     cv2.waitKey(0)
