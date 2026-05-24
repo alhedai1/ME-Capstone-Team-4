@@ -25,6 +25,7 @@ class PoleCandidate:
     area: int
     aspect: float
     center: tuple
+    source: str = "mask"
 
 
 def get_clean_pole_mask(hsv):
@@ -69,9 +70,188 @@ def get_pole_candidates(mask, min_area=300, min_aspect=1.5):
                 area=int(area),
                 aspect=float(aspect),
                 center=(x + w / 2.0, y + h / 2.0),
+                source="mask",
             )
         )
     return candidates
+
+
+def get_hough_pole_candidates(
+    frame,
+    bell,
+    color_format="rgb",
+    min_line_length=60,
+    max_line_gap=25,
+    max_bell_distance_px=80,
+    min_vertical_fraction=0.85,
+    min_below_bell_px=50,
+):
+    gray = gray_from_frame(frame, color_format)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    median = float(np.median(blur))
+    lower = max(20, int(0.66 * median))
+    upper = min(255, int(1.33 * median))
+    edges = cv2.Canny(blur, lower, upper)
+
+    lines = cv2.HoughLinesP(
+        edges,
+        1,
+        np.pi / 180,
+        threshold=35,
+        minLineLength=min_line_length,
+        maxLineGap=max_line_gap,
+    )
+    if lines is None:
+        return []
+
+    bx, by, br = bell
+    single_edge_candidates = []
+    paired_edge_candidates = []
+    valid_lines = []
+
+    for x1, y1, x2, y2 in lines[:, 0]:
+        dx = float(x2 - x1)
+        dy = float(y2 - y1)
+        length = float(np.hypot(dx, dy))
+        if length < min_line_length:
+            continue
+
+        vertical_fraction = abs(dy) / length
+        if vertical_fraction < min_vertical_fraction:
+            continue
+
+        distance_to_bell = abs(dx * (y1 - by) - dy * (x1 - bx)) / max(1.0, length)
+        if distance_to_bell > max(max_bell_distance_px, br * 2.5):
+            continue
+
+        below_bell = max(y1, y2) - by
+        if below_bell < max(min_below_bell_px, br * 2):
+            continue
+
+        vx = dx / length
+        vy = dy / length
+        x0 = (x1 + x2) / 2.0
+        y0 = (y1 + y2) / 2.0
+        valid_lines.append(
+            {
+                "points": (int(x1), int(y1), int(x2), int(y2)),
+                "line": (vx, vy, x0, y0),
+                "length": length,
+                "distance_to_bell": distance_to_bell,
+                "below_bell": below_bell,
+            }
+        )
+
+        refined_line, refined = refine_edge_line_to_center((vx, vy, x0, y0), edges)
+        rvx, rvy, rx0, ry0 = refined_line
+
+        line_mask = np.zeros(gray.shape, dtype=np.uint8)
+        cv2.line(
+            line_mask,
+            (int(rx0 - rvx * length / 2.0), int(ry0 - rvy * length / 2.0)),
+            (int(rx0 + rvx * length / 2.0), int(ry0 + rvy * length / 2.0)),
+            255,
+            9,
+        )
+
+        score = length + max(0.0, max_bell_distance_px - distance_to_bell) * 2.0 + below_bell * 0.2
+        single_edge_candidates.append(
+            PoleCandidate(
+                mask=line_mask,
+                line=refined_line,
+                area=int(score * 0.55),
+                aspect=max(1.0, length / 10.0),
+                center=(rx0, ry0),
+                source="hough_refined" if refined else "hough",
+            )
+        )
+
+    for idx, line_a in enumerate(valid_lines):
+        avx, avy, ax0, ay0 = line_a["line"]
+        for line_b in valid_lines[idx + 1 :]:
+            bvx, bvy, bx0, by0 = line_b["line"]
+            if avx * bvx + avy * bvy < 0:
+                bvx, bvy = -bvx, -bvy
+
+            angle_dot = max(-1.0, min(1.0, abs(avx * bvx + avy * bvy)))
+            angle_diff = float(np.degrees(np.arccos(angle_dot)))
+            if angle_diff > 12:
+                continue
+
+            separation = abs(avx * (by0 - ay0) - avy * (bx0 - ax0))
+            if separation < 6 or separation > 80:
+                continue
+
+            vx = avx + bvx
+            vy = avy + bvy
+            norm = max(1e-6, float(np.hypot(vx, vy)))
+            vx /= norm
+            vy /= norm
+            x0 = (ax0 + bx0) / 2.0
+            y0 = (ay0 + by0) / 2.0
+
+            distance_to_bell = line_point_distance(bell[0], bell[1], (vx, vy, x0, y0))
+            if distance_to_bell > max(max_bell_distance_px, br * 2.5):
+                continue
+
+            pair_mask = np.zeros(gray.shape, dtype=np.uint8)
+            ax1, ay1, ax2, ay2 = line_a["points"]
+            bx1, by1, bx2, by2 = line_b["points"]
+            cv2.line(pair_mask, (ax1, ay1), (ax2, ay2), 255, 5)
+            cv2.line(pair_mask, (bx1, by1), (bx2, by2), 255, 5)
+
+            length = (line_a["length"] + line_b["length"]) / 2.0
+            below_bell = max(line_a["below_bell"], line_b["below_bell"])
+            score = length * 1.8 + max(0.0, max_bell_distance_px - distance_to_bell) * 3.0 + below_bell * 0.25
+            paired_edge_candidates.append(
+                PoleCandidate(
+                    mask=pair_mask,
+                    line=(vx, vy, x0, y0),
+                    area=int(score),
+                    aspect=max(1.0, length / 7.0),
+                    center=(x0, y0),
+                    source="hough_pair",
+                )
+            )
+
+    return paired_edge_candidates if paired_edge_candidates else single_edge_candidates
+
+
+def refine_edge_line_to_center(line, edges, max_width_px=80):
+    vx, vy, x0, y0 = line
+    normal = np.array([-vy, vx], dtype=float)
+    direction = np.array([vx, vy], dtype=float)
+    height, width = edges.shape
+
+    side_distances = []
+    for side in (-1.0, 1.0):
+        distances = []
+        for t in np.linspace(-45, 45, 7):
+            base = np.array([x0, y0], dtype=float) + direction * t
+            for distance in range(8, max_width_px + 1):
+                pt = base + normal * side * distance
+                px = int(round(pt[0]))
+                py = int(round(pt[1]))
+                if px < 1 or px >= width - 1 or py < 1 or py >= height - 1:
+                    continue
+
+                if np.any(edges[py - 1 : py + 2, px - 1 : px + 2] > 0):
+                    distances.append(distance)
+                    break
+
+        if len(distances) >= 3:
+            side_distances.append((len(distances), float(np.median(distances)), side))
+
+    if not side_distances:
+        return line, False
+
+    _, separation, side = max(side_distances, key=lambda item: (item[0], -item[1]))
+    if separation < 8:
+        return line, False
+
+    x0 += normal[0] * side * separation / 2.0
+    y0 += normal[1] * side * separation / 2.0
+    return (vx, vy, x0, y0), True
 
 
 def keep_pole_like_component(mask, min_area=300, min_aspect=1.5):
@@ -108,6 +288,25 @@ def align_line_direction(line, reference_line):
     return line
 
 
+def pole_candidate_quality(candidate):
+    source_bonus = {
+        "hough_pair": 4.0,
+        "mask": 2.0,
+        "hough_refined": 1.6,
+        "hough": 1.0,
+    }.get(candidate.source, 1.0)
+    return candidate.area * candidate.aspect * source_bonus
+
+
+def pole_candidate_tracking_bonus(candidate):
+    return {
+        "hough_pair": 120.0,
+        "mask": 35.0,
+        "hough_refined": 15.0,
+        "hough": 0.0,
+    }.get(candidate.source, 0.0)
+
+
 def smooth_line(previous_line, new_line, alpha):
     new_line = align_line_direction(new_line, previous_line)
     vx = alpha * new_line[0] + (1.0 - alpha) * previous_line[0]
@@ -129,6 +328,7 @@ class PoleBellTracker:
         max_center_jump_px=180,
         smooth_alpha=0.45,
         reset_after_misses=8,
+        reacquire_on_jump=True,
     ):
         self.previous_line = None
         self.missed_frames = 0
@@ -138,6 +338,7 @@ class PoleBellTracker:
         self.max_center_jump_px = max_center_jump_px
         self.smooth_alpha = smooth_alpha
         self.reset_after_misses = reset_after_misses
+        self.reacquire_on_jump = reacquire_on_jump
 
     def reset(self):
         self.previous_line = None
@@ -148,7 +349,7 @@ class PoleBellTracker:
             return None
 
         if self.previous_line is None:
-            return max(candidates, key=lambda candidate: candidate.area * candidate.aspect)
+            return max(candidates, key=pole_candidate_quality)
 
         scored = []
         for candidate in candidates:
@@ -163,10 +364,13 @@ class PoleBellTracker:
             ):
                 continue
 
-            score = angle * 3.0 + distance + center_distance * 0.35
+            score = angle * 3.0 + distance + center_distance * 0.35 - pole_candidate_tracking_bonus(candidate)
             scored.append((score, candidate))
 
         if not scored:
+            if self.reacquire_on_jump:
+                self.previous_line = None
+                return max(candidates, key=pole_candidate_quality)
             return None
 
         return min(scored, key=lambda item: item[0])[1]
@@ -261,9 +465,14 @@ def signed_distance_to_line(px, py, line):
 
 
 def detect_pole_bell_alignment(frame, tracker=None, color_format="rgb"):
+    bell = detect_bell(frame, color_format=color_format)
+    if bell is None:
+        return None
+
     hsv = hsv_from_frame(frame, color_format)
     clean_mask = get_clean_pole_mask(hsv)
     candidates = get_pole_candidates(clean_mask)
+    candidates.extend(get_hough_pole_candidates(frame, bell, color_format=color_format))
     candidate = (
         tracker.choose_candidate(candidates)
         if tracker is not None
@@ -277,10 +486,6 @@ def detect_pole_bell_alignment(frame, tracker=None, color_format="rgb"):
     line = candidate.line
     if tracker is not None:
         line = tracker.update_line(line)
-
-    bell = detect_bell(frame, color_format=color_format)
-    if bell is None:
-        return None
 
     bx, by, _ = bell
     line = orient_line_toward_bell(line, candidate.mask, bell_center=(bx, by))
