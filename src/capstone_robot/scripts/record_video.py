@@ -88,7 +88,7 @@ def main():
     args = parse_args()
 
     try:
-        camera = PiCamera(args.width, args.height, args.fps)
+        camera = PiCamera(0, args.width, args.height, args.fps)
     except RuntimeError as exc:
         raise SystemExit(str(exc))
 

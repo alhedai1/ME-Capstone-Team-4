@@ -17,7 +17,7 @@ def draw_bell(frame_bgr, bell, status):
         cv2.circle(vis, (int(cx), int(cy)), 4, (0, 255, 0), -1)
         cv2.putText(
             vis,
-            f"area={bell.area} brass={bell.brass_ratio:.2f}",
+            f"area={bell.area_fraction:.2f} w={bell.width_fraction:.2f} h={bell.height_fraction:.2f}",
             (x, max(25, y - 8)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,
@@ -42,6 +42,10 @@ def main():
         help="Rotate frame before detection",
     )
     parser.add_argument("--required-frames", type=int, default=3, help="Stable detection count shown in status")
+    parser.add_argument("--min-area-fraction", type=float, default=0.10, help="Minimum bell mask area as frame fraction")
+    parser.add_argument("--min-width-fraction", type=float, default=0.30, help="Minimum bell bbox width as frame fraction")
+    parser.add_argument("--min-height-fraction", type=float, default=0.25, help="Minimum bell bbox height as frame fraction")
+    parser.add_argument("--max-orange-frame-fraction", type=float, default=0.22, help="Reject orange ball-dominant frames")
     parser.add_argument("--preview-width", type=int, default=640, help="MJPEG preview width")
     parser.add_argument("--host", default="0.0.0.0", help="MJPEG preview host")
     parser.add_argument("--port", type=int, default=1234, help="MJPEG preview port")
@@ -51,7 +55,13 @@ def main():
     args = parser.parse_args()
 
     camera = PiCamera(width=args.width, height=args.height, fps=args.fps)
-    tracker = BellTracker(color_format="rgb")
+    tracker = BellTracker(
+        color_format="rgb",
+        min_area_fraction=args.min_area_fraction,
+        min_width_fraction=args.min_width_fraction,
+        min_height_fraction=args.min_height_fraction,
+        max_orange_frame_fraction=args.max_orange_frame_fraction,
+    )
     preview = None
     stable_frames = 0
     frame_count = 0

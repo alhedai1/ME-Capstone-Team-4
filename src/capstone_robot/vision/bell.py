@@ -9,16 +9,27 @@ BRASS_HSV_HIGH = np.array([34, 255, 255])
 BRASS_LAB_LOW = np.array([35, 102, 132])
 BRASS_LAB_HIGH = np.array([255, 155, 195])
 
-NEUTRAL_HIGHLIGHT_LOW = np.array([0, 0, 85])
-NEUTRAL_HIGHLIGHT_HIGH = np.array([179, 105, 255])
-WARM_SHADOW_LAB_LOW = np.array([20, 100, 125])
-WARM_SHADOW_LAB_HIGH = np.array([235, 160, 190])
+METAL_HSV_LOW = np.array([20, 25, 35])
+METAL_HSV_HIGH = np.array([70, 255, 255])
+METAL_LAB_LOW = np.array([30, 0, 130])
+METAL_LAB_HIGH = np.array([255, 145, 205])
+
+ORANGE_HSV_LOW = np.array([2, 55, 35])
+ORANGE_HSV_HIGH = np.array([22, 255, 255])
+
+NEUTRAL_HIGHLIGHT_LOW = np.array([0, 0, 125])
+NEUTRAL_HIGHLIGHT_HIGH = np.array([179, 135, 255])
+WARM_SHADOW_LAB_LOW = np.array([20, 0, 125])
+WARM_SHADOW_LAB_HIGH = np.array([235, 145, 190])
 
 
 @dataclass
 class BellDetection:
     box: tuple
     area: int
+    area_fraction: float
+    width_fraction: float
+    height_fraction: float
     fill: float
     aspect: float
     brass_ratio: float
@@ -32,6 +43,9 @@ class BellCandidate:
     mask: np.ndarray
     box: tuple
     area: int
+    area_fraction: float
+    width_fraction: float
+    height_fraction: float
     fill: float
     aspect: float
     brass_ratio: float
@@ -70,13 +84,15 @@ def build_bell_mask(frame, color_format="rgb"):
     bgr = bgr_from_frame(frame, color_format).astype(np.float32)
     blue, green, red = cv2.split(bgr)
 
-    brass_hsv = cv2.inRange(hsv, BRASS_HSV_LOW, BRASS_HSV_HIGH)
-    brass_lab = cv2.inRange(lab, BRASS_LAB_LOW, BRASS_LAB_HIGH)
-    brass_seed = cv2.bitwise_and(brass_hsv, brass_lab)
+    orange_mask = cv2.inRange(hsv, ORANGE_HSV_LOW, ORANGE_HSV_HIGH)
+    orange_red_dominant = np.uint8((red > green * 1.08) & (red > blue * 1.15)) * 255
+    orange_mask = cv2.bitwise_and(orange_mask, orange_red_dominant)
 
-    red_dominant = np.uint8((red > green) & (red > blue * 1.15)) * 255
-    brass_seed = cv2.bitwise_and(brass_seed, red_dominant)
-    warm_brass_seed = cv2.bitwise_and(brass_seed, cv2.inRange(hsv[:, :, 0], 8, 24))
+    metal_hsv = cv2.inRange(hsv, METAL_HSV_LOW, METAL_HSV_HIGH)
+    metal_lab = cv2.inRange(lab, METAL_LAB_LOW, METAL_LAB_HIGH)
+    brass_seed = cv2.bitwise_and(metal_hsv, metal_lab)
+    brass_seed = cv2.bitwise_and(brass_seed, cv2.bitwise_not(orange_mask))
+    warm_brass_seed = cv2.bitwise_and(brass_seed, cv2.inRange(hsv[:, :, 0], 20, 55))
 
     brass_seed = cv2.morphologyEx(
         brass_seed,
@@ -95,6 +111,7 @@ def build_bell_mask(frame, color_format="rgb"):
     metal_fill = cv2.bitwise_and(cv2.bitwise_or(neutral_highlights, warm_shadows), near_brass)
 
     mask = cv2.bitwise_or(brass_seed, metal_fill)
+    mask = cv2.bitwise_and(mask, cv2.bitwise_not(orange_mask))
     mask = cv2.morphologyEx(
         mask,
         cv2.MORPH_CLOSE,
@@ -112,10 +129,25 @@ def get_bell_candidates(
     frame,
     color_format="rgb",
     min_area=2500,
+    min_area_fraction=0.10,
+    min_width_fraction=0.30,
+    min_height_fraction=0.25,
     min_fill=0.12,
-    min_brass_ratio=0.015,
-    min_warm_brass_ratio=0.04,
+    min_brass_ratio=0.20,
+    min_warm_brass_ratio=0.10,
+    max_orange_frame_fraction=0.22,
 ):
+    hsv = hsv_from_frame(frame, color_format)
+    bgr = bgr_from_frame(frame, color_format).astype(np.float32)
+    blue, green, red = cv2.split(bgr)
+    orange_mask = cv2.inRange(hsv, ORANGE_HSV_LOW, ORANGE_HSV_HIGH)
+    orange_mask = cv2.bitwise_and(
+        orange_mask,
+        np.uint8((red > green * 1.08) & (red > blue * 1.15)) * 255,
+    )
+    if cv2.countNonZero(orange_mask) / float(frame.shape[0] * frame.shape[1]) > max_orange_frame_fraction:
+        return []
+
     mask, brass_seed, warm_brass_seed = build_bell_mask(frame, color_format=color_format)
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
 
@@ -125,6 +157,16 @@ def get_bell_candidates(
     for label in range(1, num_labels):
         x, y, w, h, area = stats[label]
         if area < min_area or w < 45 or h < 45:
+            continue
+
+        area_fraction = area / float(img_w * img_h)
+        width_fraction = w / float(img_w)
+        height_fraction = h / float(img_h)
+        if (
+            area_fraction < min_area_fraction
+            or width_fraction < min_width_fraction
+            or height_fraction < min_height_fraction
+        ):
             continue
 
         fill = area / float(w * h)
@@ -150,6 +192,9 @@ def get_bell_candidates(
                 mask=component_mask,
                 box=(int(x), int(y), int(w), int(h)),
                 area=int(area),
+                area_fraction=float(area_fraction),
+                width_fraction=float(width_fraction),
+                height_fraction=float(height_fraction),
                 fill=float(fill),
                 aspect=float(aspect),
                 brass_ratio=float(brass_ratio),
@@ -166,6 +211,9 @@ def candidate_to_detection(candidate):
     return BellDetection(
         box=candidate.box,
         area=candidate.area,
+        area_fraction=candidate.area_fraction,
+        width_fraction=candidate.width_fraction,
+        height_fraction=candidate.height_fraction,
         fill=candidate.fill,
         aspect=candidate.aspect,
         brass_ratio=candidate.brass_ratio,
@@ -198,6 +246,10 @@ class BellTracker:
         smooth_alpha=0.55,
         reset_after_misses=8,
         reacquire_on_jump=True,
+        min_area_fraction=0.10,
+        min_width_fraction=0.30,
+        min_height_fraction=0.25,
+        max_orange_frame_fraction=0.22,
     ):
         self.previous_detection = None
         self.missed_frames = 0
@@ -207,6 +259,10 @@ class BellTracker:
         self.smooth_alpha = smooth_alpha
         self.reset_after_misses = reset_after_misses
         self.reacquire_on_jump = reacquire_on_jump
+        self.min_area_fraction = min_area_fraction
+        self.min_width_fraction = min_width_fraction
+        self.min_height_fraction = min_height_fraction
+        self.max_orange_frame_fraction = max_orange_frame_fraction
 
     def reset(self):
         self.previous_detection = None
@@ -251,6 +307,18 @@ class BellTracker:
             self.previous_detection = BellDetection(
                 box=smooth_box(self.previous_detection.box, detection.box, alpha),
                 area=int(round(alpha * detection.area + (1.0 - alpha) * self.previous_detection.area)),
+                area_fraction=(
+                    alpha * detection.area_fraction
+                    + (1.0 - alpha) * self.previous_detection.area_fraction
+                ),
+                width_fraction=(
+                    alpha * detection.width_fraction
+                    + (1.0 - alpha) * self.previous_detection.width_fraction
+                ),
+                height_fraction=(
+                    alpha * detection.height_fraction
+                    + (1.0 - alpha) * self.previous_detection.height_fraction
+                ),
                 fill=alpha * detection.fill + (1.0 - alpha) * self.previous_detection.fill,
                 aspect=alpha * detection.aspect + (1.0 - alpha) * self.previous_detection.aspect,
                 brass_ratio=alpha * detection.brass_ratio + (1.0 - alpha) * self.previous_detection.brass_ratio,
@@ -271,7 +339,14 @@ class BellTracker:
             self.reset()
 
     def detect(self, frame):
-        candidates = get_bell_candidates(frame, color_format=self.color_format)
+        candidates = get_bell_candidates(
+            frame,
+            color_format=self.color_format,
+            min_area_fraction=self.min_area_fraction,
+            min_width_fraction=self.min_width_fraction,
+            min_height_fraction=self.min_height_fraction,
+            max_orange_frame_fraction=self.max_orange_frame_fraction,
+        )
         candidate = self.choose_candidate(candidates)
         if candidate is None:
             self.mark_missed()
@@ -280,8 +355,22 @@ class BellTracker:
         return self.update_detection(candidate)
 
 
-def detect_bell(frame, color_format="rgb"):
-    candidates = get_bell_candidates(frame, color_format=color_format)
+def detect_bell(
+    frame,
+    color_format="rgb",
+    min_area_fraction=0.10,
+    min_width_fraction=0.30,
+    min_height_fraction=0.25,
+    max_orange_frame_fraction=0.22,
+):
+    candidates = get_bell_candidates(
+        frame,
+        color_format=color_format,
+        min_area_fraction=min_area_fraction,
+        min_width_fraction=min_width_fraction,
+        min_height_fraction=min_height_fraction,
+        max_orange_frame_fraction=max_orange_frame_fraction,
+    )
     candidate = max(candidates, key=lambda item: item.score, default=None)
     if candidate is None:
         return None

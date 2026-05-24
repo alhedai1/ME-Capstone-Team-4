@@ -34,19 +34,32 @@ def rotate_frame(frame, rotation):
     return frame
 
 class PiCamera:
-    def __init__(self, width, height, fps):
+    def __init__(self, idx, width, height, fps):
         try:
             from picamera2 import Picamera2
             from libcamera import controls
         except ImportError as exc:
             raise RuntimeError("Picamera2 is not installed. Install python3-picamera2 on the Raspberry Pi.") from exc
 
-        self.picam2 = Picamera2(0)
+        self.picam2 = Picamera2(idx)
         # self.picam2.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": 10.0})
         # time.sleep(0.5)
         # self.picam2.set_controls({"LensPosition": 0.0})
         # time.sleep(0.5)
-        self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+        # dont use autofocus
+        # self.picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+        # instead, fix 
+        aligning_controls = {
+            "AfMode": controls.AfModeEnum.Manual,
+            "LensPosition": 0.0,  # Lock focus at approximately 3 meters (infinity)
+            "AwbMode": controls.AwbModeEnum.Daylight,
+            "ExposureValue": -1.5
+        }
+        striking_controls = {
+            "LensPosition": 12.0,           # Instantly force lens to maximum physical close-up limit
+            "ExposureValue": 0.0
+        }
+        self.picam2.set_controls(aligning_controls)
         config = self.picam2.create_video_configuration(
             main={"size": (width, height), "format": "RGB888"},
             controls={"FrameRate": fps},
