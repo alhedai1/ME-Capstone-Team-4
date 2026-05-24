@@ -42,7 +42,7 @@ def load_labels(path):
 
 def choose_pole(detections, target_label="pole"):
     if target_label:
-        poles = [det for det in detections if det.label.lower() == target_label.lower()]
+        poles = [det for det in detections if det.label.lower() == target_label.lower() and det]
         if poles:
             return max(poles, key=lambda det: det.confidence)
 
@@ -77,7 +77,7 @@ class CapstoneRobot(object):
             model_path=MODEL_PATH,
             width=640,
             height=480,
-            fps=30,
+            fps=15,
             bbox_normalization=True,
             bbox_order="xy",
         )
@@ -91,17 +91,17 @@ class CapstoneRobot(object):
 
         self.search_startup_wait_seconds = 1.0
         self.pole_conf_threshold = 0.5
-        self.pole_center_deadband_px = 20
+        self.pole_center_deadband_px = 10
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
-        self.pole_smooth_alpha = 0.85
+        self.pole_smooth_alpha = 1
         self.search_turn_speed = 0.2
         self.center_turn_speed = 0.2
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
         self.approach_speed = 0.25
-        self.approach_steer_gain = 0.2
+        self.approach_steer_gain = 0.8
         self.approach_stop_width_fraction = 0.16
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
@@ -239,15 +239,15 @@ if __name__ == "__main__":
     # robot.run_robot()
     robot = CapstoneRobot()
     try:
-        # print(robot.state)
-        # robot.search_for_pole()
-        # print(robot.state)
+        print(robot.state)
+        robot.search_for_pole()
+        print(robot.state)
         # robot.state = "approaching_pole"
-        # robot.approach_pole()
+        robot.approach_pole()
         # robot.run_robot()
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()
-        robot.state = "climbing_pole"
-        robot.climb_pole()
+        # robot.state = "climbing_pole"
+        # robot.climb_pole()
     finally:
         robot.close()

@@ -44,7 +44,7 @@ def main():
     parser.add_argument("--required-frames", type=int, default=3, help="Stable detection count shown in status")
     parser.add_argument("--preview-width", type=int, default=640, help="MJPEG preview width")
     parser.add_argument("--host", default="0.0.0.0", help="MJPEG preview host")
-    parser.add_argument("--port", type=int, default=1235, help="MJPEG preview port")
+    parser.add_argument("--port", type=int, default=1234, help="MJPEG preview port")
     parser.add_argument("--jpeg-quality", type=int, default=75, help="MJPEG preview JPEG quality")
     parser.add_argument("--no-preview", action="store_true", help="Disable MJPEG preview server")
     parser.add_argument("--show", action="store_true", help="Also show an OpenCV window if a desktop is available")
@@ -91,7 +91,8 @@ def main():
             fps = frame_count / elapsed
             status = f"{status}  fps={fps:.1f}"
 
-            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            # frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            frame_bgr = frame_rgb
             vis = draw_bell(frame_bgr, bell, status)
 
             if preview is not None:

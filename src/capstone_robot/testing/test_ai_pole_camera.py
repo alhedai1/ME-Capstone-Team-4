@@ -81,7 +81,7 @@ def main():
     parser.add_argument("--labels", type=Path, default=DEFAULT_LABELS_PATH, help="Labels file path")
     parser.add_argument("--width", type=int, default=640, help="AI camera frame width")
     parser.add_argument("--height", type=int, default=480, help="AI camera frame height")
-    parser.add_argument("--fps", type=int, default=30, help="AI camera frame rate")
+    parser.add_argument("--fps", type=int, default=15, help="AI camera frame rate")
     parser.add_argument("--threshold", type=float, default=0.5, help="Detection confidence threshold")
     parser.add_argument("--target-label", default="pole", help="Preferred label to track")
     parser.add_argument("--smooth-alpha", type=float, default=0.85, help="Same box smoothing alpha used by states")
