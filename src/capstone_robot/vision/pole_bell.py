@@ -6,7 +6,7 @@ import numpy as np
 
 LOWER_BRIGHT = np.array([0, 0, 200])
 UPPER_BRIGHT = np.array([180, 100, 255])
-LOWER_DARK = np.array([00, 0, 0])
+LOWER_DARK = np.array([0, 0, 0])
 UPPER_DARK = np.array([180, 100, 50])
 
 

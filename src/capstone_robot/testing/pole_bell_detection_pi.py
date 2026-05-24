@@ -197,6 +197,8 @@ try:
         if not ok or frame is None:
             print("No camera frame received")
             break
+
+        frame = rotate_frame(frame, "180")
         img = frame
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
         clean_mask = get_clean_pole_mask(hsv)
