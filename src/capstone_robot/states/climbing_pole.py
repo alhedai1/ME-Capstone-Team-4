@@ -2,8 +2,6 @@ import time
 
 import cv2
 
-from capstone_robot.states.striking_bell import detect_bell
-
 
 def update_front_preview(robot, frame, pole, status):
     vis = frame.copy()
@@ -19,9 +17,9 @@ def update_front_preview(robot, frame, pole, status):
 def update_bell_preview(robot, frame, bell, status):
     vis = frame.copy()
     if bell is not None:
-        x, y, w, h, area = bell
+        x, y, w, h = bell.box
         cv2.rectangle(vis, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.putText(vis, f"{int(area)}px", (x, max(25, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+        cv2.putText(vis, f"{bell.area}px", (x, max(25, y - 8)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
     cv2.putText(vis, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     robot.update_preview(vis)
@@ -140,7 +138,7 @@ def climb_until_bell(robot):
             time.sleep(0.05)
             continue
 
-        bell = detect_bell(frame)
+        bell = robot.bell_tracker.detect(frame)
         if bell is None:
             seen_frames = 0
             robot.motors.forward(robot.climb_speed)
@@ -165,6 +163,7 @@ def climb_until_bell(robot):
 def run(robot):
     print("[STATE] Climbing pole...")
     try:
+        robot.bell_tracker.reset()
         center_front_pole(robot)
         attach_to_pole(robot)
 

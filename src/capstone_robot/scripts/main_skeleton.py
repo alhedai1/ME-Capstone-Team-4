@@ -24,6 +24,7 @@ from gpiozero.pins.pigpio import PiGPIOFactory
 # from picamera2 import Picamera2 # For your AI Camera
 from capstone_robot.states import approaching_pole, aligning_bell, climbing_pole, searching_pole, striking_bell
 from capstone_robot.utils import *
+from capstone_robot.vision.bell import BellTracker
 from capstone_robot.vision.pole_bell import PoleBellTracker
 
 REPO_ROOT = find_repo_root(__file__)
@@ -82,6 +83,7 @@ class CapstoneRobot(object):
         )
         self.ai_labels = load_labels(LABELS_PATH)
         self.pole_bell_tracker = PoleBellTracker()
+        self.bell_tracker = BellTracker()
         self.preview_width = 320
         self.preview_server = MjpegPreview(host="0.0.0.0", port=1234, jpeg_quality=75)
         self.preview_server.start()
