@@ -4,6 +4,12 @@ import cv2
 
 from capstone_robot.utils import rotate_frame
 
+aligning_controls = {
+    "AfMode": controls.AfModeEnum.Manual,
+    "LensPosition": 0.0,  # Lock focus at approximately 3 meters (infinity)
+    "AwbMode": controls.AwbModeEnum.Daylight,
+    "ExposureValue": -1.5
+}
 
 def draw_line(frame, line, color=(0, 255, 0), thickness=2):
     vx, vy, x0, y0 = line
@@ -184,6 +190,7 @@ def orbit_rotation_for_turn(side):
 
 
 def run(robot):
+    robot.pi_camera.picam2.set_controls(aligning_controls)
     robot.pole_bell_tracker.reset()
     side = wait_for_bell_side(robot)
     if side is None:

@@ -32,6 +32,8 @@ REPO_ROOT = find_repo_root(__file__)
 MODEL_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx/network.rpk"
 LABELS_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx/labels.txt"
 
+### CHANGE PICAM MODULE 3 CONTROLS (STRIKING - ALIGNING)
+
 # Device.pin_factory = PiGPIOFactory()
 
 def load_labels(path):
@@ -81,7 +83,7 @@ class CapstoneRobot(object):
         #     min_pulse_width=0.001,
         #     max_pulse_width=0.002,
         #     frame_width=0.02)
-        self.pi_camera = PiCamera(idx=0, width=640, height=480, fps=15)
+        self.pi_camera = PiCamera(idx=0, width=640, height=480, fps=30)
         self.ai_camera = AiCamera(
             model_path=MODEL_PATH,
             width=640,

@@ -2,6 +2,10 @@ import time
 
 import cv2
 
+striking_controls = {
+    "LensPosition": 12.0,           # Instantly force lens to maximum physical close-up limit
+    "ExposureValue": 0.0
+}
 
 def wait_for_bell(robot, required_frames=3):
     seen_frames = 0
@@ -60,6 +64,7 @@ def run(robot):
     print("[STATE] Bell within reach! Striking...")
     robot.motors.stop()
     robot.bell_tracker.reset()
+    robot.pi_camera.picam2.set_controls(striking_controls)
 
     if wait_for_bell(robot):
         strike_once(robot)
