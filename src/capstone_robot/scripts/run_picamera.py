@@ -39,7 +39,7 @@ def main():
     # print(f"Using model: {model_path}")
 
     try:
-        camera = PiCamera(args.width, args.height, args.fps)
+        camera = PiCamera(0, args.width, args.height, args.fps)
     except RuntimeError as exc:
         raise SystemExit(str(exc))
 

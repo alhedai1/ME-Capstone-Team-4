@@ -59,7 +59,7 @@ class PiCamera:
             "LensPosition": 12.0,           # Instantly force lens to maximum physical close-up limit
             "ExposureValue": 0.0
         }
-        self.picam2.set_controls(aligning_controls)
+        self.picam2.set_controls(striking_controls)
         config = self.picam2.create_video_configuration(
             main={"size": (width, height), "format": "RGB888"},
             controls={"FrameRate": fps},

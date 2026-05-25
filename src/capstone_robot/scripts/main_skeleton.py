@@ -109,7 +109,7 @@ class CapstoneRobot(object):
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
-        self.approach_speed = 0.25
+        self.approach_speed = 0.2
         self.approach_steer_gain = 0.8
         self.approach_stop_width_fraction = 0.16
         self.approach_stop_frames_required = 3
