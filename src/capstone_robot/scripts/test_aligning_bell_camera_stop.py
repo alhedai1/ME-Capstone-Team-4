@@ -212,7 +212,7 @@ def turn_until_pole_angle(args, motors, camera, tracker, preview, direction, tar
 
             if not update_display(args, preview, frame, alignment, status):
                 return False
-            time.sleep(0.05)
+            time.sleep(0.1)
 
         print(f"[ALIGN TEST] Turn timed out after {args.turn_timeout:.1f}s")
         return False
@@ -242,7 +242,7 @@ def orbit_until_bell_aligned(args, motors, camera, tracker, preview, rotation):
                     return False
                 if missed_frames >= args.missed_frame_limit:
                     return False
-                time.sleep(0.05)
+                time.sleep(0.1)
                 continue
 
             missed_frames = 0
@@ -265,7 +265,7 @@ def orbit_until_bell_aligned(args, motors, camera, tracker, preview, rotation):
 
             if not update_display(args, preview, frame, alignment, status):
                 return False
-            time.sleep(0.05)
+            time.sleep(0.1)
 
         print(f"[ALIGN TEST] Orbit timed out after {args.orbit_timeout:.1f}s")
         return False
@@ -312,16 +312,16 @@ def parse_args():
     parser.add_argument("--orbit-speed", type=float, default=0.2)
     parser.add_argument("--alignment-error-threshold-px", type=float, default=20.0)
     parser.add_argument("--stable-frames", type=int, default=4)
-    parser.add_argument("--missed-frame-limit", type=int, default=15)
+    parser.add_argument("--missed-frame-limit", type=int, default=50)
     parser.add_argument("--angle-threshold-deg", type=float, default=12.0)
     parser.add_argument("--turn-stable-frames", type=int, default=3)
-    parser.add_argument("--turn-timeout", type=float, default=5.0)
-    parser.add_argument("--orbit-timeout", type=float, default=25.0)
+    parser.add_argument("--turn-timeout", type=float, default=30.0)
+    parser.add_argument("--orbit-timeout", type=float, default=30.0)
     parser.add_argument("--stop-pause", type=float, default=0.2)
-    parser.add_argument("--left-lpwm", default="BOARD35")
-    parser.add_argument("--left-rpwm", default="BOARD12")
-    parser.add_argument("--right-lpwm", default="BOARD11")
-    parser.add_argument("--right-rpwm", default="BOARD7")
+    parser.add_argument("--left-lpwm", default="BOARD7")
+    parser.add_argument("--left-rpwm", default="BOARD11")
+    parser.add_argument("--right-lpwm", default="BOARD35")
+    parser.add_argument("--right-rpwm", default="BOARD12")
     parser.add_argument("--preview-width", type=int, default=640)
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=1234)

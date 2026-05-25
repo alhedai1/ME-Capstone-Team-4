@@ -63,10 +63,10 @@ class CapstoneRobot(object):
 
     def __init__(self):
         # Hardware Setup (Adjust GPIO pins based on your hardware)
-        self.left_rpwm = 'BOARD12'
-        self.left_lpwm = 'BOARD35'
-        self.right_rpwm = 'BOARD7'
-        self.right_lpwm = 'BOARD11'
+        self.left_rpwm = 'BOARD11'
+        self.left_lpwm = 'BOARD7'
+        self.right_rpwm = 'BOARD12'
+        self.right_lpwm = 'BOARD35'
         self.motors = Robot(left=(self.left_lpwm, self.left_rpwm), right=(self.right_lpwm, self.right_rpwm))
         # self.servo = AngularServo(
         #     16,
@@ -100,7 +100,7 @@ class CapstoneRobot(object):
 
         self.search_startup_wait_seconds = 1.0
         self.pole_conf_threshold = 0.5
-        self.pole_center_deadband_px = 10
+        self.pole_center_deadband_px = 20
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 1
@@ -110,14 +110,14 @@ class CapstoneRobot(object):
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
         self.approach_speed = 0.4
-        self.approach_steer_gain = 0.8
+        self.approach_steer_gain = 0.5
         self.approach_stop_width_fraction = 0.16
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
 
         self.align_turn_speed = 0.3
-        self.align_quarter_turn_seconds = 1.0
-        self.orbit_speed = 0.2
+        self.align_quarter_turn_seconds = 1
+        self.orbit_speed = 0.5
         self.alignment_error_threshold_px = 20
         self.alignment_stable_frames_required = 4
         self.alignment_missed_frame_limit = 15
