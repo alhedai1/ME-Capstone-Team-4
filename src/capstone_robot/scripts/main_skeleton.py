@@ -24,7 +24,7 @@ from gpiozero.pins.pigpio import PiGPIOFactory
 # from picamera2 import Picamera2 # For your AI Camera
 from capstone_robot.states import approaching_pole, aligning_bell, climbing_pole, searching_pole, striking_bell
 from capstone_robot.utils import *
-from capstone_robot.vision.bell import BellTracker
+from capstone_robot.vision.bell2 import BellTracker
 from capstone_robot.vision.pole_bell import PoleBellTracker
 
 REPO_ROOT = find_repo_root(__file__)
@@ -83,7 +83,7 @@ class CapstoneRobot(object):
         #     min_pulse_width=0.001,
         #     max_pulse_width=0.002,
         #     frame_width=0.02)
-        self.pi_camera = PiCamera(idx=0, width=640, height=480, fps=30)
+        self.pi_camera = PiCamera(idx=0, width=640, height=480, fps=15)
         self.ai_camera = AiCamera(
             model_path=MODEL_PATH,
             width=640,
@@ -127,7 +127,7 @@ class CapstoneRobot(object):
         self.climb_center_timeout_seconds = 2.0
         self.climb_attach_speed = 0.2
         self.climb_attach_seconds = 2
-        self.climb_speed = 1.0
+        self.climb_speed = 0.3
         self.climb_bell_stable_frames_required = 3
         self.climb_max_seconds = 20.0
         
@@ -256,9 +256,11 @@ if __name__ == "__main__":
         # robot.state = "approaching_pole"
         # robot.approach_pole()
         # robot.run_robot()
-        robot.state = 'aligning_bell'
-        robot.align_to_bell()
+        # robot.state = 'aligning_bell'
+        # robot.align_to_bell()
         # robot.state = "climbing_pole"
         # robot.climb_pole()
+        robot.state = "striking_bell"
+        robot.strike_bell()
     finally:
         robot.close()
