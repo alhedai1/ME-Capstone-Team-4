@@ -122,7 +122,7 @@ def get_bell_candidates(
     min_width_fraction=0.30,
     min_height_fraction=0.25,
     min_fill=0.12,
-    min_brass_ratio=0.6,
+    min_brass_ratio=0.1,
     min_warm_brass_ratio=0.04,
     max_orange_frame_fraction=None,
 ):

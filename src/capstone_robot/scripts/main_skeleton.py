@@ -25,7 +25,7 @@ from gpiozero.pins.pigpio import PiGPIOFactory
 from capstone_robot.states import approaching_pole, aligning_bell_circle as aligning_bell, climbing_pole, searching_pole, striking_bell
 from capstone_robot.utils import *
 from capstone_robot.vision.bell2 import BellTracker
-from capstone_robot.vision.pole_bell import PoleBellTracker
+from capstone_robot.vision.pole_bell2 import PoleBellTracker
 
 REPO_ROOT = find_repo_root(__file__)
 
@@ -114,7 +114,7 @@ class CapstoneRobot(object):
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
-        self.approach_speed = 0.4
+        self.approach_speed = 0.3
         self.approach_steer_gain = 0.5
         self.approach_stop_width_fraction = 0.16
         self.approach_stop_frames_required = 3
@@ -136,6 +136,11 @@ class CapstoneRobot(object):
         self.bell_circle_orbit_turn_bias = 0.12
         self.bell_circle_orbit_forward_seconds = 1.0
         self.bell_circle_settle_seconds = 0.5
+        self.pole_bell_error_threshold_px = 20
+        self.pole_bell_orbit_min_seconds = 0.2
+        self.pole_bell_orbit_max_seconds = 1.2
+        self.pole_bell_orbit_px_per_second = 80.0
+        self.pole_bell_turn_time_scale = 0.75
 
         self.climb_center_timeout_seconds = 2.0
         self.climb_attach_speed = 0.2

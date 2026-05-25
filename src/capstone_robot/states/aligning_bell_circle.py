@@ -3,7 +3,7 @@ import time
 import cv2
 
 from capstone_robot.utils import rotate_frame
-from capstone_robot.vision.bell_circle import BellCircle
+from capstone_robot.vision.pole_bell2 import PoleBellTracker
 
 try:
     from libcamera import controls
@@ -27,17 +27,28 @@ def setting(robot, name, default):
     return getattr(robot, name, default)
 
 
-def update_bell_preview(robot, frame, bell, status):
+def draw_line(img, line, color=(0, 255, 0), thickness=2):
+    out = img.copy()
+    vx, vy, x0, y0 = line
+    t = 1000
+    x1 = int(x0 - vx * t)
+    y1 = int(y0 - vy * t)
+    x2 = int(x0 + vx * t)
+    y2 = int(y0 + vy * t)
+    cv2.line(out, (x1, y1), (x2, y2), color, thickness)
+    return out
+
+
+def update_alignment_preview(robot, frame, alignment, status):
     if frame is None:
         return
 
     vis = frame.copy()
-    height, width = vis.shape[:2]
-    cv2.line(vis, (width // 2, 0), (width // 2, height), (255, 0, 0), 1)
-
-    if bell is not None:
-        cv2.circle(vis, (bell.x, bell.y), bell.radius, (0, 0, 255), 2)
-        cv2.circle(vis, (bell.x, bell.y), 3, (0, 0, 255), -1)
+    if alignment is not None:
+        vis = draw_line(vis, alignment.pole_line, (0, 255, 0), 2)
+        bx, by, br = alignment.bell
+        cv2.circle(vis, (bx, by), br, (0, 0, 255), 2)
+        cv2.circle(vis, (bx, by), 3, (0, 0, 255), -1)
 
     cv2.putText(vis, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
     robot.update_preview(vis)
@@ -64,18 +75,21 @@ def smooth_box(old_box, new_box, alpha):
     return tuple(int(alpha * new + (1.0 - alpha) * old) for old, new in zip(old_box, new_box))
 
 
-def read_upward_bell(robot, rotation="180"):
+def get_pole_bell_tracker(robot):
+    tracker = getattr(robot, "pole_bell_tracker", None)
+    if tracker is None or tracker.__class__.__module__ != "capstone_robot.vision.pole_bell2":
+        tracker = PoleBellTracker(color_format="rgb")
+        robot.pole_bell_tracker = tracker
+    return tracker
+
+
+def read_upward_alignment(robot, rotation="180"):
     ok, frame = robot.pi_camera.read()
     if not ok or frame is None:
         return None, None
 
     frame = rotate_frame(frame, rotation)
-    detector = getattr(robot, "bell_circle", None)
-    if detector is None:
-        detector = BellCircle(color_format="rgb")
-        robot.bell_circle = detector
-
-    return frame, detector.detect(frame)
+    return frame, get_pole_bell_tracker(robot).detect(frame)
 
 
 def center_front_pole(robot, label="CENTER", search_direction="right"):
@@ -243,52 +257,105 @@ def approach_front_pole(robot):
     return False
 
 
-def wait_for_bell_position(robot):
+def wait_for_pole_bell_alignment(robot):
     stable_frames = 0
     missed_frames = 0
 
     while robot.state == "aligning_bell":
-        frame, bell = read_upward_bell(robot)
+        frame, alignment = read_upward_alignment(robot)
         if frame is None:
             robot.motors.stop()
             print("[ALIGN-CIRCLE] No upward camera frame received")
             time.sleep(0.1)
             continue
 
-        if bell is None:
+        if alignment is None:
             missed_frames += 1
             stable_frames = 0
             robot.motors.stop()
-            print(f"[ALIGN-CIRCLE] Need bell circle ({missed_frames}/{setting(robot, 'alignment_missed_frame_limit', 15)})")
-            update_bell_preview(robot, frame, None, f"BELL: LOST {missed_frames}")
+            print(
+                f"[ALIGN-CIRCLE] Need pole+bell alignment "
+                f"({missed_frames}/{setting(robot, 'alignment_missed_frame_limit', 15)})"
+            )
+            update_alignment_preview(robot, frame, None, f"ALIGN: LOST {missed_frames}")
             time.sleep(0.05)
             continue
 
         missed_frames = 0
-        error_x = bell.x - frame.shape[1] / 2.0
-        threshold = setting(robot, "bell_circle_error_threshold_px", setting(robot, "alignment_error_threshold_px", 20))
+        error = alignment.error_px
+        threshold = setting(robot, "pole_bell_error_threshold_px", setting(robot, "alignment_error_threshold_px", 20))
 
-        if abs(error_x) <= threshold:
+        if abs(error) <= threshold:
             stable_frames += 1
             robot.motors.stop()
             print(
-                f"[ALIGN-CIRCLE] Bell centered "
+                f"[ALIGN-CIRCLE] Pole and bell aligned "
                 f"({stable_frames}/{setting(robot, 'alignment_stable_frames_required', 4)}), "
-                f"error_x={error_x:.1f}px"
+                f"error={error:.1f}px"
             )
-            update_bell_preview(robot, frame, bell, f"BELL: CENTERED {stable_frames}")
+            update_alignment_preview(robot, frame, alignment, f"ALIGN: OK {stable_frames} err={error:.1f}")
 
             if stable_frames >= setting(robot, "alignment_stable_frames_required", 4):
-                return "aligned"
+                return "aligned", 0.0
         else:
-            side = "left" if error_x < 0 else "right"
-            print(f"[ALIGN-CIRCLE] Bell is {side}, error_x={error_x:.1f}px")
-            update_bell_preview(robot, frame, bell, f"BELL: {side} {error_x:.1f}")
-            return side
+            side = alignment.side
+            print(f"[ALIGN-CIRCLE] Pole/bell error={error:.1f}px, bell side={side}")
+            update_alignment_preview(robot, frame, alignment, f"ALIGN: {side} err={error:.1f}")
+            return side, error
 
         time.sleep(0.05)
 
-    return None
+    return None, None
+
+
+def wait_for_bell_side(robot):
+    side, _ = wait_for_pole_bell_alignment(robot)
+    return side
+
+
+def orbit_until_bell_aligned(robot, rotation="180"):
+    stable_frames = 0
+    missed_frames = 0
+
+    while robot.state == "aligning_bell":
+        frame, alignment = read_upward_alignment(robot, rotation=rotation)
+        if alignment is None:
+            missed_frames += 1
+            stable_frames = 0
+            robot.motors.stop()
+            print(
+                f"[ALIGN-CIRCLE] Lost pole/bell while orbiting "
+                f"({missed_frames}/{setting(robot, 'alignment_missed_frame_limit', 15)})"
+            )
+            update_alignment_preview(robot, frame, None, f"ORBIT: LOST {missed_frames}")
+            time.sleep(0.05)
+            continue
+
+        missed_frames = 0
+        error = alignment.error_px
+        threshold = setting(robot, "pole_bell_error_threshold_px", setting(robot, "alignment_error_threshold_px", 20))
+
+        if abs(error) <= threshold:
+            stable_frames += 1
+            robot.motors.stop()
+            update_alignment_preview(robot, frame, alignment, f"ORBIT: ALIGNED {stable_frames}")
+            if stable_frames >= setting(robot, "alignment_stable_frames_required", 4):
+                return True
+        else:
+            stable_frames = 0
+            side = alignment.side
+            duration = orbit_seconds_from_error(robot, error)
+            print(f"[ALIGN-CIRCLE] Orbit correction side={side}, error={error:.1f}px, duration={duration:.2f}s")
+            drive_forward_with_bias(robot, robot.opposite_direction(side), duration)
+            get_pole_bell_tracker(robot).reset()
+
+        time.sleep(0.05)
+
+    return False
+
+
+def center_front_pole_for_climb(robot):
+    return center_front_pole(robot, label="FINAL CENTER")
 
 
 def drive_forward_with_bias(robot, bias_side, seconds):
@@ -308,15 +375,26 @@ def drive_forward_with_bias(robot, bias_side, seconds):
     time.sleep(0.15)
 
 
-def orbit_step(robot, bell_side):
+def orbit_seconds_from_error(robot, error_px):
+    min_seconds = setting(robot, "pole_bell_orbit_min_seconds", 0.20)
+    max_seconds = setting(robot, "pole_bell_orbit_max_seconds", 1.20)
+    px_per_second = setting(robot, "pole_bell_orbit_px_per_second", 80.0)
+    seconds = abs(error_px) / max(1.0, px_per_second)
+    return max(min_seconds, min(max_seconds, seconds))
+
+
+def orbit_step(robot, bell_side, error_px):
     reverse_speed = setting(robot, "bell_circle_reverse_speed", 0.25)
     reverse_seconds = setting(robot, "bell_circle_reverse_seconds", 0.25)
-    turn_seconds = setting(robot, "bell_circle_turn_seconds", 0.35)
-    forward_seconds = setting(robot, "bell_circle_orbit_forward_seconds", 0.45)
+    turn_seconds = orbit_seconds_from_error(robot, error_px) * setting(robot, "pole_bell_turn_time_scale", 0.75)
+    forward_seconds = orbit_seconds_from_error(robot, error_px)
     settle_seconds = setting(robot, "bell_circle_settle_seconds", 0.15)
     turn_speed = setting(robot, "align_turn_speed", 0.3)
 
-    print(f"[ALIGN-CIRCLE] Incremental orbit step for bell on {bell_side}")
+    print(
+        f"[ALIGN-CIRCLE] Orbit step side={bell_side}, error={error_px:.1f}px, "
+        f"turn={turn_seconds:.2f}s, forward={forward_seconds:.2f}s"
+    )
     robot.motors.backward(reverse_speed)
     time.sleep(reverse_seconds)
     robot.motors.stop()
@@ -333,12 +411,13 @@ def run(robot):
         robot.pi_camera.picam2.set_controls(aligning_controls)
 
     max_steps = setting(robot, "bell_circle_max_orbit_steps", 20)
+    get_pole_bell_tracker(robot).reset()
 
     if not center_front_pole(robot, label="PREALIGN"):
         return
 
     for step in range(1, max_steps + 1):
-        side = wait_for_bell_position(robot)
+        side, error = wait_for_pole_bell_alignment(robot)
         if side is None:
             return
 
@@ -347,15 +426,18 @@ def run(robot):
                 robot.aligned()
             return
 
-        print(f"[ALIGN-CIRCLE] Orbit iteration {step}/{max_steps}, bell_side={side}")
-        orbit_step(robot, side)
+        print(f"[ALIGN-CIRCLE] Orbit iteration {step}/{max_steps}, side={side}, error={error:.1f}px")
+        orbit_step(robot, side, error)
 
         search_direction = robot.opposite_direction(side)
+        get_pole_bell_tracker(robot).reset()
         if not center_front_pole(robot, label="RECENTER", search_direction=search_direction):
             return
 
         if not approach_front_pole(robot):
             return
 
+        get_pole_bell_tracker(robot).reset()
+
     robot.motors.stop()
-    print(f"[ALIGN-CIRCLE] Bell did not center after {max_steps} orbit steps")
+    print(f"[ALIGN-CIRCLE] Pole and bell did not align after {max_steps} orbit steps")
