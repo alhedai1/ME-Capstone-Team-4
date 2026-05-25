@@ -54,7 +54,7 @@ def main():
     parser.add_argument("--show", action="store_true", help="Also show an OpenCV window if a desktop is available")
     args = parser.parse_args()
 
-    camera = PiCamera(width=args.width, height=args.height, fps=args.fps)
+    camera = PiCamera(0, width=args.width, height=args.height, fps=args.fps)
     tracker = BellTracker(
         color_format="rgb",
         min_area_fraction=args.min_area_fraction,
