@@ -6,9 +6,9 @@ from gpiozero import Robot
 
 # Motor driver pins.
 # Each side uses two PWM pins: one for each direction.
-LEFT_LPWM = "BOARD35"
-LEFT_RPWM = "BOARD12"
-RIGHT_LPWM = "BOARD11"
+LEFT_LPWM = "BOARD7"
+LEFT_RPWM = "BOARD11"
+RIGHT_LPWM = "BOARD35"
 RIGHT_RPWM = "BOARD7"
 
 
