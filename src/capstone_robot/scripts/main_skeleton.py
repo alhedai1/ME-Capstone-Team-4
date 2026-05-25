@@ -104,12 +104,12 @@ class CapstoneRobot(object):
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 1
-        self.search_turn_speed = 0.2
-        self.center_turn_speed = 0.2
+        self.search_turn_speed = 0.3
+        self.center_turn_speed = 0.3
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
-        self.approach_speed = 0.2
+        self.approach_speed = 0.4
         self.approach_steer_gain = 0.8
         self.approach_stop_width_fraction = 0.16
         self.approach_stop_frames_required = 3
