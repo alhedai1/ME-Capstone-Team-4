@@ -2,6 +2,8 @@ import time
 
 import cv2
 
+from capstone_robot.utils import rotate_frame
+
 
 def draw_line(frame, line, color=(0, 255, 0), thickness=2):
     vx, vy, x0, y0 = line
@@ -38,12 +40,12 @@ def update_front_preview(robot, frame, pole, status):
     robot.update_preview(vis)
 
 
-def read_upward_alignment(robot):
+def read_upward_alignment(robot, rotation="180"):
     ok, frame = robot.pi_camera.read()
     if not ok or frame is None:
         return None, None
 
-    frame = cv2.rotate(frame, cv2.ROTATE_180)
+    frame = rotate_frame(frame, rotation)
     return frame, robot.pole_bell_tracker.detect(frame)
 
 
@@ -84,12 +86,12 @@ def wait_for_bell_side(robot):
     return None
 
 
-def orbit_until_bell_aligned(robot):
+def orbit_until_bell_aligned(robot, rotation="180"):
     stable_frames = 0
     missed_frames = 0
 
     while robot.state == "aligning_bell":
-        frame, alignment = read_upward_alignment(robot)
+        frame, alignment = read_upward_alignment(robot, rotation=rotation)
         if alignment is None:
             missed_frames += 1
             stable_frames = 0
@@ -173,6 +175,14 @@ def center_front_pole_for_climb(robot):
     return False
 
 
+def orbit_rotation_for_turn(side):
+    if side == "left":
+        return "ccw"
+    if side == "right":
+        return "cw"
+    return "180"
+
+
 def run(robot):
     robot.pole_bell_tracker.reset()
     side = wait_for_bell_side(robot)
@@ -188,7 +198,9 @@ def run(robot):
     robot.turn_in_place(side, robot.align_quarter_turn_seconds)
     robot.pole_bell_tracker.reset()
 
-    if not orbit_until_bell_aligned(robot):
+    orbit_rotation = orbit_rotation_for_turn(side)
+    print(f"[ALIGN] Using {orbit_rotation} camera rotation while orbiting")
+    if not orbit_until_bell_aligned(robot, rotation=orbit_rotation):
         return
 
     face_pole_direction = robot.opposite_direction(side)
