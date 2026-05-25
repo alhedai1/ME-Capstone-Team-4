@@ -77,7 +77,7 @@ def read_upward_bell(robot, rotation="180"):
     return frame, detector.detect(frame)
 
 
-def center_front_pole(robot, label="CENTER"):
+def center_front_pole(robot, label="CENTER", search_direction="right"):
     stable_frames = 0
     missed_frames = 0
     last_pole = None
@@ -116,9 +116,15 @@ def center_front_pole(robot, label="CENTER"):
             stable_frames = 0
             last_pole = None
             smoothed_box = None
-            print(f"[ALIGN-CIRCLE] Front pole not detected; rotating right slowly ({missed_frames})")
+            print(
+                f"[ALIGN-CIRCLE] Front pole not detected; rotating {search_direction} slowly "
+                f"({missed_frames})"
+            )
             update_front_preview(robot, frame, None, f"{label}: NO POLE {missed_frames}")
-            robot.motors.right(setting(robot, "search_turn_speed", 0.3))
+            if search_direction == "left":
+                robot.motors.left(setting(robot, "search_turn_speed", 0.3))
+            else:
+                robot.motors.right(setting(robot, "search_turn_speed", 0.3))
             time.sleep(0.05)
             continue
 
@@ -320,9 +326,6 @@ def orbit_step(robot, bell_side):
     bias_side = robot.opposite_direction(bell_side)
     drive_forward_with_bias(robot, bias_side, forward_seconds)
 
-    face_pole_direction = robot.opposite_direction(bell_side)
-    robot.turn_in_place(face_pole_direction, turn_seconds, speed=turn_speed)
-
 
 def run(robot):
     if aligning_controls:
@@ -346,7 +349,8 @@ def run(robot):
         print(f"[ALIGN-CIRCLE] Orbit iteration {step}/{max_steps}, bell_side={side}")
         orbit_step(robot, side)
 
-        if not center_front_pole(robot, label="RECENTER"):
+        search_direction = robot.opposite_direction(side)
+        if not center_front_pole(robot, label="RECENTER", search_direction=search_direction):
             return
 
         if not approach_front_pole(robot):
