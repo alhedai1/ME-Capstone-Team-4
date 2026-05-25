@@ -115,7 +115,7 @@ class CapstoneRobot(object):
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
 
-        self.align_turn_speed = 0.2
+        self.align_turn_speed = 0.3
         self.align_quarter_turn_seconds = 1.0
         self.orbit_speed = 0.2
         self.alignment_error_threshold_px = 20
@@ -248,14 +248,14 @@ if __name__ == "__main__":
     # robot.run_robot()
     robot = CapstoneRobot()
     try:
-        print(robot.state)
-        robot.search_for_pole()
-        print(robot.state)
+        # print(robot.state)
+        # robot.search_for_pole()
+        # print(robot.state)
         # robot.state = "approaching_pole"
-        robot.approach_pole()
+        # robot.approach_pole()
         # robot.run_robot()
-        # robot.state = 'aligning_bell'
-        # robot.align_to_bell()
+        robot.state = 'aligning_bell'
+        robot.align_to_bell()
         # robot.state = "climbing_pole"
         # robot.climb_pole()
     finally:
