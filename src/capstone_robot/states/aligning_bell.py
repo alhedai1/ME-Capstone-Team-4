@@ -3,6 +3,7 @@ import time
 import cv2
 
 from capstone_robot.utils import rotate_frame
+from libcamera import controls
 
 aligning_controls = {
     "AfMode": controls.AfModeEnum.Manual,

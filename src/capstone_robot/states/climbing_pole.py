@@ -2,6 +2,10 @@ import time
 
 import cv2
 
+striking_controls = {
+    "LensPosition": 12.0,           # Instantly force lens to maximum physical close-up limit
+    "ExposureValue": 0.0
+}
 
 def update_front_preview(robot, frame, pole, status):
     vis = frame.copy()
@@ -162,6 +166,7 @@ def climb_until_bell(robot):
 
 def run(robot):
     print("[STATE] Climbing pole...")
+    robot.pi_camera.picam2.set_controls(striking_controls)
     try:
         robot.bell_tracker.reset()
         center_front_pole(robot)
