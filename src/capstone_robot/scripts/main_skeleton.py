@@ -22,7 +22,7 @@ from gpiozero import Device
 from gpiozero.pins.pigpio import PiGPIOFactory
 # import cv2 # For your Camera Module 3
 # from picamera2 import Picamera2 # For your AI Camera
-from capstone_robot.states import approaching_pole, aligning_bell, climbing_pole, searching_pole, striking_bell
+from capstone_robot.states import approaching_pole, aligning_bell_circle as aligning_bell, climbing_pole, searching_pole, striking_bell
 from capstone_robot.utils import *
 from capstone_robot.vision.bell import BellTracker
 from capstone_robot.vision.pole_bell import PoleBellTracker

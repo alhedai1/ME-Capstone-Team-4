@@ -196,62 +196,62 @@ def signed_distance_to_line(px, py, line):
 
 ### run on images folder
 
-# fig = plt.figure(figsize=(8, 6))
+fig = plt.figure(figsize=(8, 6))
 
-# # img_path = IMG_PATH
-# for img_path in img_paths:
-#     print(img_path)
-#     img = cv2.imread(img_path)
-#     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-#     clean_mask = get_clean_pole_mask(hsv)
-#     pole_only = keep_pole_like_component(clean_mask)
-#     line = fit_line_from_mask(pole_only)
+# img_path = IMG_PATH
+for img_path in img_paths:
+    print(img_path)
+    img = cv2.imread(img_path)
+    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    clean_mask = get_clean_pole_mask(hsv)
+    pole_only = keep_pole_like_component(clean_mask)
+    line = fit_line_from_mask(pole_only)
 
-#     # vis = img.copy()
-#     # if line is not None:
-#     #     vis = draw_line(vis, line)
-#     # else:
-#     #     print("No line detected")
-#     bell, circles = detect_bell(img)
-#     # vis2 = img.copy()
-#     # for x, y, r in circles:
-#     #     cv2.circle(vis2, (x, y), r, (255, 0, 0), 1)
-#     # if bell is not None:
-#     #     bx, by, br = bell
-#     #     cv2.circle(vis2, (bx, by), br, (0, 0, 255), 3)
-#     # else:
-#     #     print("No bell detected")
+    # vis = img.copy()
+    # if line is not None:
+    #     vis = draw_line(vis, line)
+    # else:
+    #     print("No line detected")
+    bell, circles = detect_bell(img)
+    # vis2 = img.copy()
+    # for x, y, r in circles:
+    #     cv2.circle(vis2, (x, y), r, (255, 0, 0), 1)
+    # if bell is not None:
+    #     bx, by, br = bell
+    #     cv2.circle(vis2, (bx, by), br, (0, 0, 255), 3)
+    # else:
+    #     print("No bell detected")
 
-#     ALIGN_THRESH_PX = 20
-#     vis = img.copy()
-#     if line is not None:
-#         vis = draw_line(vis, line)
-#     if bell is not None:
-#         bx, by, br = bell
-#         cv2.circle(vis, (bx, by), br, (0, 0, 255), 2)
-#         # cv2.circle(vis, (bx, by), 3, (0, 0, 255), -1)
-#     if line is not None and bell is not None:
-#         bx, by, _ = bell
-#         line = orient_line_toward_bell(
-#             line,
-#             pole_only,
-#             bell_center=(bx, by)
-#         )
-#         error = signed_distance_to_line(bx, by, line)
+    ALIGN_THRESH_PX = 20
+    vis = img.copy()
+    if line is not None:
+        vis = draw_line(vis, line)
+    if bell is not None:
+        bx, by, br = bell
+        cv2.circle(vis, (bx, by), br, (0, 0, 255), 2)
+        # cv2.circle(vis, (bx, by), 3, (0, 0, 255), -1)
+    if line is not None and bell is not None:
+        bx, by, _ = bell
+        line = orient_line_toward_bell(
+            line,
+            pole_only,
+            bell_center=(bx, by)
+        )
+        error = signed_distance_to_line(bx, by, line)
 
-#         if abs(error) < ALIGN_THRESH_PX:
-#             status = f"ALIGNED, error={error:.1f}"
-#         elif error > 0:
-#             status = f"RIGHT SIDE, error={error:.1f}"
-#         else:
-#             status = f"LEFT SIDE, error={error:.1f}"
+        if abs(error) < ALIGN_THRESH_PX:
+            status = f"ALIGNED, error={error:.1f}"
+        elif error > 0:
+            status = f"RIGHT SIDE, error={error:.1f}"
+        else:
+            status = f"LEFT SIDE, error={error:.1f}"
         
-#         vx, vy, x0, y0 = line
-#         cv2.putText(vis, status, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-#         show(fig, vis)
-#     else:
-#         print("Need both pole line and bell detection")
-
+        vx, vy, x0, y0 = line
+        cv2.putText(vis, status, (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        show(fig, vis)
+    else:
+        print("Need both pole line and bell detection")
+sys.exit()
 
 cap = cv2.VideoCapture(str(VID_PATH))
 

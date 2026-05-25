@@ -7,8 +7,8 @@ import cv2
 from capstone_robot.utils import find_repo_root
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_INPUT_DIR = REPO_ROOT / "src/capstone_robot/data/videos/may24/bell_indoors"
-DEFAULT_OUTPUT_DIR = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may24"
+DEFAULT_INPUT_DIR = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_align - Trim.mp4"
+DEFAULT_OUTPUT_DIR = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may25"
 DEFAULT_FRAME_STEP = 10
 VIDEO_EXTENSIONS = {".avi", ".mov", ".mp4", ".m4v", ".mkv", ".webm"}
 # VIDEO_ROTATIONS = {

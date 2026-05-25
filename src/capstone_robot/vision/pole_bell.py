@@ -7,7 +7,7 @@ import numpy as np
 LOWER_BRIGHT = np.array([0, 0, 200])
 UPPER_BRIGHT = np.array([180, 100, 255])
 LOWER_DARK = np.array([0, 0, 0])
-UPPER_DARK = np.array([180, 100, 50])
+UPPER_DARK = np.array([180, 100, 80])
 
 
 @dataclass
@@ -45,7 +45,35 @@ def get_clean_pole_mask(hsv):
     return clean_mask
 
 
-def get_pole_candidates(mask, min_area=300, min_aspect=1.5):
+def box_touches_frame_edge(x, y, w, h, frame_shape, edge_margin=35):
+    height, width = frame_shape[:2]
+    return (
+        x <= edge_margin
+        or y <= edge_margin
+        or x + w >= width - edge_margin
+        or y + h >= height - edge_margin
+    )
+
+
+def line_segment_touches_frame_edge(x1, y1, x2, y2, frame_shape, edge_margin=60):
+    height, width = frame_shape[:2]
+    points = ((x1, y1), (x2, y2))
+    return any(
+        x <= edge_margin
+        or y <= edge_margin
+        or x >= width - edge_margin
+        or y >= height - edge_margin
+        for x, y in points
+    )
+
+
+def get_pole_candidates(
+    mask,
+    min_area=300,
+    min_aspect=1.5,
+    require_edge_connection=True,
+    edge_margin=35,
+):
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
     candidates = []
 
@@ -56,6 +84,9 @@ def get_pole_candidates(mask, min_area=300, min_aspect=1.5):
 
         aspect = max(w, h) / max(1, min(w, h))
         if aspect < min_aspect:
+            continue
+
+        if require_edge_connection and not box_touches_frame_edge(x, y, w, h, mask.shape, edge_margin):
             continue
 
         component_mask = np.uint8(labels == label) * 255
@@ -85,6 +116,8 @@ def get_hough_pole_candidates(
     max_bell_distance_px=80,
     min_vertical_fraction=0.85,
     min_below_bell_px=50,
+    require_edge_connection=True,
+    edge_margin=60,
 ):
     gray = gray_from_frame(frame, color_format)
     blur = cv2.GaussianBlur(gray, (5, 5), 0)
@@ -126,6 +159,16 @@ def get_hough_pole_candidates(
 
         below_bell = max(y1, y2) - by
         if below_bell < max(min_below_bell_px, br * 2):
+            continue
+
+        if require_edge_connection and not line_segment_touches_frame_edge(
+            x1,
+            y1,
+            x2,
+            y2,
+            gray.shape,
+            edge_margin=edge_margin,
+        ):
             continue
 
         vx = dx / length
@@ -471,6 +514,7 @@ def detect_pole_bell_alignment(frame, tracker=None, color_format="rgb"):
 
     hsv = hsv_from_frame(frame, color_format)
     clean_mask = get_clean_pole_mask(hsv)
+    cv2.imshow("clean_mask", clean_mask)
     candidates = get_pole_candidates(clean_mask)
     candidates.extend(get_hough_pole_candidates(frame, bell, color_format=color_format))
     candidate = (

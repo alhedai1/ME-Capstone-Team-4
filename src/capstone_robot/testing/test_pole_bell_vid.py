@@ -9,7 +9,7 @@ from capstone_robot.vision.pole_bell import PoleBellTracker
 
 REPO_ROOT = find_repo_root(__file__)
 IMG_PATH = "../data/extracted_frames/may15/test1_trim/frame_000000.jpg"
-VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may24/pole_bell_11am/alignleft.mp4"
+VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_align - Trim.mp4"
 IMG_FOLDER = REPO_ROOT / "src/capstone_robot/data/extracted_frames/may15/test1_trim"
 
 def draw_line(img, line, color=(0, 255, 0), thickness=2):
