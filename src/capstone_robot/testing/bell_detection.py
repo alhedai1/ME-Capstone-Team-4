@@ -3,11 +3,11 @@ from pathlib import Path
 
 import cv2
 
-from capstone_robot.vision.bell import detect_bell
+from capstone_robot.vision.bell2 import detect_bell
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp"}
-DEFAULT_IMAGE_FOLDER = Path(__file__).resolve().parent.parent / "data" / "extracted_frames" / "may24" / "bell_indoors"
+DEFAULT_IMAGE_FOLDER = Path(__file__).resolve().parent.parent / "data" / "extracted_frames" / "may15" / "bell1"
 
 
 def draw_result(img, result):
