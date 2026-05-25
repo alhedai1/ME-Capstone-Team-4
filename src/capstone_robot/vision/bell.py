@@ -4,12 +4,7 @@ import cv2
 import numpy as np
 
 
-BRASS_HSV_LOW = np.array([8, 45, 50])
-BRASS_HSV_HIGH = np.array([34, 255, 255])
-BRASS_LAB_LOW = np.array([35, 102, 132])
-BRASS_LAB_HIGH = np.array([255, 155, 195])
-
-METAL_HSV_LOW = np.array([20, 25, 35])
+METAL_HSV_LOW = np.array([22, 30, 45])
 METAL_HSV_HIGH = np.array([70, 255, 255])
 METAL_LAB_LOW = np.array([30, 0, 130])
 METAL_LAB_HIGH = np.array([255, 145, 205])
@@ -17,10 +12,8 @@ METAL_LAB_HIGH = np.array([255, 145, 205])
 ORANGE_HSV_LOW = np.array([2, 55, 35])
 ORANGE_HSV_HIGH = np.array([22, 255, 255])
 
-NEUTRAL_HIGHLIGHT_LOW = np.array([0, 0, 125])
+NEUTRAL_HIGHLIGHT_LOW = np.array([0, 0, 175])
 NEUTRAL_HIGHLIGHT_HIGH = np.array([179, 135, 255])
-WARM_SHADOW_LAB_LOW = np.array([20, 0, 125])
-WARM_SHADOW_LAB_HIGH = np.array([235, 145, 190])
 
 
 @dataclass
@@ -90,27 +83,26 @@ def build_bell_mask(frame, color_format="rgb"):
 
     metal_hsv = cv2.inRange(hsv, METAL_HSV_LOW, METAL_HSV_HIGH)
     metal_lab = cv2.inRange(lab, METAL_LAB_LOW, METAL_LAB_HIGH)
-    brass_seed = cv2.bitwise_and(metal_hsv, metal_lab)
-    brass_seed = cv2.bitwise_and(brass_seed, cv2.bitwise_not(orange_mask))
-    warm_brass_seed = cv2.bitwise_and(brass_seed, cv2.inRange(hsv[:, :, 0], 20, 55))
+    metal_seed = cv2.bitwise_and(metal_hsv, metal_lab)
+    metal_seed = cv2.bitwise_and(metal_seed, cv2.bitwise_not(orange_mask))
 
-    brass_seed = cv2.morphologyEx(
-        brass_seed,
+    metal_seed = cv2.morphologyEx(
+        metal_seed,
         cv2.MORPH_OPEN,
         cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)),
     )
 
     near_brass = cv2.dilate(
-        brass_seed,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (61, 61)),
+        metal_seed,
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (41, 41)),
         iterations=1,
     )
 
     neutral_highlights = cv2.inRange(hsv, NEUTRAL_HIGHLIGHT_LOW, NEUTRAL_HIGHLIGHT_HIGH)
-    warm_shadows = cv2.inRange(lab, WARM_SHADOW_LAB_LOW, WARM_SHADOW_LAB_HIGH)
-    metal_fill = cv2.bitwise_and(cv2.bitwise_or(neutral_highlights, warm_shadows), near_brass)
+    neutral_highlights = cv2.bitwise_and(neutral_highlights, cv2.inRange(lab, np.array([0, 0, 120]), np.array([255, 150, 205])))
+    highlight_fill = cv2.bitwise_and(neutral_highlights, near_brass)
 
-    mask = cv2.bitwise_or(brass_seed, metal_fill)
+    mask = cv2.bitwise_or(metal_seed, highlight_fill)
     mask = cv2.bitwise_and(mask, cv2.bitwise_not(orange_mask))
     mask = cv2.morphologyEx(
         mask,
@@ -120,21 +112,21 @@ def build_bell_mask(frame, color_format="rgb"):
     mask = cv2.morphologyEx(
         mask,
         cv2.MORPH_OPEN,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)),
+        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
     )
-    return mask, brass_seed, warm_brass_seed
+    return mask, metal_seed, neutral_highlights
 
 
 def get_bell_candidates(
     frame,
     color_format="rgb",
     min_area=2500,
-    min_area_fraction=0.10,
-    min_width_fraction=0.30,
-    min_height_fraction=0.25,
-    min_fill=0.12,
-    min_brass_ratio=0.20,
-    min_warm_brass_ratio=0.10,
+    min_area_fraction=0.12,
+    min_width_fraction=0.35,
+    min_height_fraction=0.28,
+    min_fill=0.22,
+    min_brass_ratio=0.25,
+    min_warm_brass_ratio=0.03,
     max_orange_frame_fraction=0.22,
 ):
     hsv = hsv_from_frame(frame, color_format)
@@ -148,7 +140,7 @@ def get_bell_candidates(
     if cv2.countNonZero(orange_mask) / float(frame.shape[0] * frame.shape[1]) > max_orange_frame_fraction:
         return []
 
-    mask, brass_seed, warm_brass_seed = build_bell_mask(frame, color_format=color_format)
+    mask, metal_seed, highlight_seed = build_bell_mask(frame, color_format=color_format)
     num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(mask)
 
     img_h, img_w = mask.shape
@@ -175,10 +167,10 @@ def get_bell_candidates(
             continue
 
         component_mask = np.uint8(labels == label) * 255
-        brass_pixels = cv2.countNonZero(cv2.bitwise_and(brass_seed, component_mask))
+        brass_pixels = cv2.countNonZero(cv2.bitwise_and(metal_seed, component_mask))
         brass_ratio = brass_pixels / float(area)
-        warm_brass_pixels = cv2.countNonZero(cv2.bitwise_and(warm_brass_seed, component_mask))
-        warm_brass_ratio = warm_brass_pixels / float(area)
+        highlight_pixels = cv2.countNonZero(cv2.bitwise_and(highlight_seed, component_mask))
+        warm_brass_ratio = highlight_pixels / float(area)
         if brass_ratio < min_brass_ratio or warm_brass_ratio < min_warm_brass_ratio:
             continue
 
@@ -246,9 +238,9 @@ class BellTracker:
         smooth_alpha=0.55,
         reset_after_misses=8,
         reacquire_on_jump=True,
-        min_area_fraction=0.10,
-        min_width_fraction=0.30,
-        min_height_fraction=0.25,
+        min_area_fraction=0.12,
+        min_width_fraction=0.35,
+        min_height_fraction=0.28,
         max_orange_frame_fraction=0.22,
     ):
         self.previous_detection = None
@@ -358,9 +350,9 @@ class BellTracker:
 def detect_bell(
     frame,
     color_format="rgb",
-    min_area_fraction=0.10,
-    min_width_fraction=0.30,
-    min_height_fraction=0.25,
+    min_area_fraction=0.12,
+    min_width_fraction=0.35,
+    min_height_fraction=0.28,
     max_orange_frame_fraction=0.22,
 ):
     candidates = get_bell_candidates(
