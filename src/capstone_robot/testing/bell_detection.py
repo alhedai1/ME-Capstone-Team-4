@@ -7,7 +7,7 @@ from capstone_robot.vision.bell2 import detect_bell
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp"}
-DEFAULT_IMAGE_FOLDER = Path(__file__).resolve().parent.parent / "data" / "extracted_frames" / "may15" / "bell1"
+DEFAULT_IMAGE_FOLDER = Path(__file__).resolve().parent.parent / "data" / "extracted_frames" / "may25" / "may25_strike_bell"
 
 
 def draw_result(img, result):

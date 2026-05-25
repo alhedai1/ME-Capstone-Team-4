@@ -19,9 +19,9 @@ VIDEO_EXTENSIONS = {".avi", ".mov", ".mp4", ".m4v", ".mkv", ".webm"}
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Extract one frame every N frames from all videos in a folder."
+        description="Extract one frame every N frames from a video file or all videos in a folder."
     )
-    parser.add_argument("--input-dir", type=Path, default=DEFAULT_INPUT_DIR)
+    parser.add_argument("--input", type=Path, default=DEFAULT_INPUT_DIR, help="input video file or directory")
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--frame-step", type=int, default=DEFAULT_FRAME_STEP)
     parser.add_argument("--image-ext", choices=["jpg", "png"], default="jpg")
@@ -85,19 +85,25 @@ def main():
     if args.frame_step <= 0:
         raise SystemExit("--frame-step must be greater than 0")
 
-    if not args.input_dir.is_dir():
-        raise SystemExit(f"Input folder does not exist: {args.input_dir}")
+    if not args.input.exists():
+        raise SystemExit(f"Input does not exist: {args.input}")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
-    videos = sorted(
-        path
-        for path in args.input_dir.iterdir()
-        if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS
-    )
-
-    if not videos:
-        raise SystemExit(f"No videos found in: {args.input_dir}")
+    if args.input.is_dir():
+        videos = sorted(
+            path
+            for path in args.input.iterdir()
+            if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS
+        )
+        if not videos:
+            raise SystemExit(f"No videos found in: {args.input}")
+    elif args.input.is_file():
+        if args.input.suffix.lower() not in VIDEO_EXTENSIONS:
+            raise SystemExit(f"Input file is not a supported video: {args.input}")
+        videos = [args.input]
+    else:
+        raise SystemExit(f"Unsupported input: {args.input}")
 
     total_saved = 0
     for video_path in videos:

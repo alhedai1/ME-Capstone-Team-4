@@ -4,7 +4,7 @@ import time
 import cv2
 
 from capstone_robot.utils import MjpegPreview, PiCamera, resize_preview, rotate_frame
-from capstone_robot.vision.bell import BellTracker
+from capstone_robot.vision.bell2 import BellTracker
 
 
 def draw_bell(frame_bgr, bell, status):
