@@ -18,6 +18,7 @@ if controls is not None:
         "AwbMode": controls.AwbModeEnum.Daylight,
         "ExposureValue": -1.5,
     }
+    print("GOT ALIGNING CONTROLS")
 else:
     aligning_controls = {}
 

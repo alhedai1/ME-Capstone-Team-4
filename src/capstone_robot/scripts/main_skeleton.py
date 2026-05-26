@@ -51,13 +51,16 @@ def choose_pole(detections, frame, target_label="pole"):
             pole_center_x = x + w / 2.0
             frame_width = frame.shape[1]
             if det.label.lower() == target_label.lower():
-                if pole_center_x >= 0.2 * frame_width:
-                    if pole_center_x <= 0.8 * frame_width:
+                if pole_center_x >= 0.4 * frame_width:
+                    if pole_center_x <= 0.6 * frame_width:
                         poles.append(det)
+                        print(f"DET CENTER: {pole_center_x}")
         if poles:
             return max(poles, key=lambda det: det.confidence)
+        else:
+            return None
 
-    return max(detections, key=lambda det: det.confidence) if detections else None
+    # return max(detections, key=lambda det: det.confidence) if detections else None
 
 class CapstoneRobot(object):
     # Define your state names
@@ -106,8 +109,8 @@ class CapstoneRobot(object):
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 1
-        self.search_turn_speed = 0.3
-        self.center_turn_speed = 0.3
+        self.search_turn_speed = 0.25
+        self.center_turn_speed = 0.25
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
@@ -129,9 +132,9 @@ class CapstoneRobot(object):
         self.bell_circle_reverse_speed = 0.3
         self.bell_circle_reverse_seconds = 0.5
         self.bell_circle_turn_seconds = 1.5
-        self.bell_circle_orbit_forward_speed = 0.3
+        self.bell_circle_orbit_forward_speed = 0.2
         self.bell_circle_orbit_turn_bias = 0.12
-        self.bell_circle_orbit_forward_seconds = 0.5
+        self.bell_circle_orbit_forward_seconds = 1.0
         self.bell_circle_settle_seconds = 0.5
 
         self.climb_center_timeout_seconds = 2.0
