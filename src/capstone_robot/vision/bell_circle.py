@@ -21,7 +21,7 @@ class BellCircle:
         color_format="rgb",
         dp=1,
         min_dist=60,
-        param1=300,
+        param1=100,
         param2=20,
         min_radius=10,
         max_radius=30,

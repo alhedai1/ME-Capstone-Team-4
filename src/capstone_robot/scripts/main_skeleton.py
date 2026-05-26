@@ -106,8 +106,8 @@ class CapstoneRobot(object):
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 1
-        self.search_turn_speed = 0.2
-        self.center_turn_speed = 0.2
+        self.search_turn_speed = 0.3
+        self.center_turn_speed = 0.3
 
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
@@ -117,7 +117,7 @@ class CapstoneRobot(object):
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
 
-        self.align_turn_speed = 0.2
+        self.align_turn_speed = 0.3
         self.align_quarter_turn_seconds = 1
         self.orbit_speed = 0.5
         self.alignment_error_threshold_px = 20
@@ -126,13 +126,13 @@ class CapstoneRobot(object):
 
         self.bell_circle_error_threshold_px = 20
         self.bell_circle_max_orbit_steps = 20
-        self.bell_circle_reverse_speed = 0.2
-        self.bell_circle_reverse_seconds = 0.2
-        self.bell_circle_turn_seconds = 1.0
-        self.bell_circle_orbit_forward_speed = 0.2
+        self.bell_circle_reverse_speed = 0.3
+        self.bell_circle_reverse_seconds = 0.5
+        self.bell_circle_turn_seconds = 1.5
+        self.bell_circle_orbit_forward_speed = 0.3
         self.bell_circle_orbit_turn_bias = 0.12
-        self.bell_circle_orbit_forward_seconds = 1.0
-        self.bell_circle_settle_seconds = 0.15
+        self.bell_circle_orbit_forward_seconds = 0.5
+        self.bell_circle_settle_seconds = 0.5
 
         self.climb_center_timeout_seconds = 2.0
         self.climb_attach_speed = 0.2
@@ -266,11 +266,11 @@ if __name__ == "__main__":
         # robot.state = "approaching_pole"
         # robot.approach_pole()
         # robot.run_robot()
-        # robot.state = 'aligning_bell'
-        # robot.align_to_bell()
+        robot.state = 'aligning_bell'
+        robot.align_to_bell()
         # robot.state = "climbing_pole"
         # robot.climb_pole()
-        robot.state = "striking_bell"
-        robot.strike_bell()
+        # robot.state = "striking_bell"
+        # robot.strike_bell()
     finally:
         robot.close()
