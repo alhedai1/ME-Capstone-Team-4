@@ -9,7 +9,8 @@ from capstone_robot.vision.pole_bell2 import PoleBellTracker
 
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_VIDEO = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_align_trim.mp4"
+# DEFAULT_VIDEO = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_align_trim.mp4"
+DEFAULT_VIDEO = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_alignright.mp4"
 
 
 def draw_line(img, line, color=(0, 255, 0), thickness=2):
@@ -53,6 +54,14 @@ def draw_alignment(frame, alignment, threshold):
 def orbit_seconds_from_error(error_px, px_per_second, min_seconds, max_seconds):
     seconds = abs(error_px) / max(1.0, px_per_second)
     return max(min_seconds, min(max_seconds, seconds))
+
+
+def normalize_rotation(rotation):
+    if rotation == "90cw":
+        return "cw"
+    if rotation == "90ccw":
+        return "ccw"
+    return rotation
 
 
 def parse_args():
@@ -116,8 +125,9 @@ def main():
                 break
             frame_idx += 1
 
-            if args.rotation != "none":
-                frame = rotate_frame(frame, args.rotation)
+            rotation = normalize_rotation(args.rotation)
+            if rotation != "none":
+                frame = rotate_frame(frame, rotation)
 
             alignment = tracker.detect(frame)
             timestamp = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000.0

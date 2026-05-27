@@ -22,7 +22,7 @@ from gpiozero import Device
 from gpiozero.pins.pigpio import PiGPIOFactory
 # import cv2 # For your Camera Module 3
 # from picamera2 import Picamera2 # For your AI Camera
-from capstone_robot.states import approaching_pole, aligning_bell_circle as aligning_bell, climbing_pole, searching_pole, striking_bell
+from capstone_robot.states import approaching_pole, aligning_bell2 as aligning_bell, climbing_pole, searching_pole, striking_bell
 from capstone_robot.utils import *
 from capstone_robot.vision.bell2 import BellTracker
 from capstone_robot.vision.pole_bell2 import PoleBellTracker
@@ -51,8 +51,8 @@ def choose_pole(detections, frame, target_label="pole"):
             pole_center_x = x + w / 2.0
             frame_width = frame.shape[1]
             if det.label.lower() == target_label.lower():
-                if pole_center_x >= 0.4 * frame_width:
-                    if pole_center_x <= 0.6 * frame_width:
+                if pole_center_x >= 0.3 * frame_width:
+                    if pole_center_x <= 0.7 * frame_width:
                         poles.append(det)
                         print(f"DET CENTER: {pole_center_x}")
         if poles:
@@ -86,7 +86,7 @@ class CapstoneRobot(object):
         #     min_pulse_width=0.001,
         #     max_pulse_width=0.002,
         #     frame_width=0.02)
-        self.pi_camera = PiCamera(idx=0, width=640, height=480, fps=15)
+        self.pi_camera = PiCamera(idx=0, width=640, height=480, fps=30)
         self.ai_camera = AiCamera(
             model_path=MODEL_PATH,
             width=640,
@@ -103,23 +103,26 @@ class CapstoneRobot(object):
         self.preview_server.start()
         print("Preview stream: http://<RPI_IP_ADDRESS>:1234")
 
+        ### SEARCHING POLE
         self.search_startup_wait_seconds = 1.0
-        self.pole_conf_threshold = 0.5
+        self.pole_conf_threshold = 0.7
         self.pole_center_deadband_px = 20
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
-        self.pole_smooth_alpha = 1
+        self.pole_smooth_alpha = 0.8
         self.search_turn_speed = 0.25
         self.center_turn_speed = 0.25
 
+        ### APPROACHING POLE
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
         self.approach_speed = 0.3
         self.approach_steer_gain = 0.5
-        self.approach_stop_width_fraction = 0.16
+        self.approach_stop_width_fraction = 0.2
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
 
+        ### ALIGNING POLE/BELL
         self.align_turn_speed = 0.3
         self.align_quarter_turn_seconds = 1
         self.orbit_speed = 0.5
@@ -127,27 +130,30 @@ class CapstoneRobot(object):
         self.alignment_stable_frames_required = 4
         self.alignment_missed_frame_limit = 15
 
-        self.bell_circle_error_threshold_px = 20
-        self.bell_circle_max_orbit_steps = 20
-        self.bell_circle_reverse_speed = 0.3
-        self.bell_circle_reverse_seconds = 0.5
-        self.bell_circle_turn_seconds = 1.5
-        self.bell_circle_orbit_forward_speed = 0.2
-        self.bell_circle_orbit_turn_bias = 0.12
-        self.bell_circle_orbit_forward_seconds = 1.0
-        self.bell_circle_settle_seconds = 0.5
+        self.pole_bell_error_threshold_px = 20
+        self.pole_bell_max_orbit_steps = 20
+        self.pole_bell_reverse_speed = 0.3
+        self.pole_bell_reverse_seconds = 0.5
+        self.pole_bell_turn_seconds = 1.5
+        self.pole_bell_orbit_forward_speed = 0.2
+        self.pole_bell_orbit_turn_bias = 0.1
+        # self.pole_bell_orbit_forward_seconds = 1.0
+        self.pole_bell_settle_seconds = 1.0
         self.pole_bell_error_threshold_px = 20
         self.pole_bell_orbit_min_seconds = 0.2
         self.pole_bell_orbit_max_seconds = 1.2
-        self.pole_bell_orbit_px_per_second = 80.0
+        self.pole_bell_orbit_px_per_second = 80.0 ##### tune to adjust how long robot orbits
         self.pole_bell_turn_time_scale = 0.75
 
+        ### CLIMBING POLE
         self.climb_center_timeout_seconds = 2.0
+        self.start_climb_settle_seconds = 1.0 ## settle after attach, before climb
         self.climb_attach_speed = 0.2
-        self.climb_attach_seconds = 2
-        self.climb_speed = 0.3
+        self.climb_attach_seconds = 1
+        self.climb_speed = 0.4
         self.climb_bell_stable_frames_required = 3
         self.climb_max_seconds = 20.0
+        self.climb_hold_speed = 0.3
         
         # Initialize Finite State Machine
         self.machine = Machine(model=self, states=CapstoneRobot.states, initial='searching_pole')

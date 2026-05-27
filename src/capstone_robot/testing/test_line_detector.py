@@ -3,12 +3,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from capstone_robot.utils import rotate_frame
 from pathlib import Path
+import math
 
 # Change this to your saved frame path
 
 IMG_PATH = "../data/extracted_frames/may25/may25_align_trim/frame_000100.jpg"
 IMG_FOLDER = "../data/extracted_frames/may25/may25_align_trim"
 VID_PATH = "../data/videos/may26/recording.mp4"
+VID_PATH = "../data/videos/may25/may25_align_trim.mp4"
 IMG_PATHS = [path for path in Path(IMG_FOLDER).iterdir()]
 
 def show(img, title="", cmap=None, size=(8, 6)):
@@ -42,21 +44,150 @@ def draw_lines(img, lines):
 def near_border(x, y, w, h, margin=5):
     return x < margin or x > w - margin or y < margin or y > h - margin
 
-# def line_length(x1, y1, x2, y2):
-#     return math.hypot(x2 - x1, y2 - y1)
+def line_length(x1, y1, x2, y2):
+    return math.hypot(x2 - x1, y2 - y1)
 
-# def line_angle(x1, y1, x2, y2):
-#     # angle in degrees, normalized to [0, 180)
-#     ang = math.degrees(math.atan2(y2 - y1, x2 - x1))
-#     if ang < 0:
-#         ang += 180
-#     if ang >= 180:
-#         ang -= 180
-#     return ang
+def line_angle(x1, y1, x2, y2):
+    # angle in degrees, normalized to [0, 180)
+    ang = math.degrees(math.atan2(y2 - y1, x2 - x1))
+    if ang < 0:
+        ang += 180
+    if ang >= 180:
+        ang -= 180
+    return ang
 
-# def angle_diff(a, b):
-#     d = abs(a - b)
-#     return min(d, 180 - d)
+def angle_diff(a, b):
+    d = abs(a - b)
+    return min(d, 180 - d)
+
+
+def line_from_points(x1, y1, x2, y2):
+    dx = float(x2 - x1)
+    dy = float(y2 - y1)
+    length = max(1e-6, math.hypot(dx, dy))
+    return dx / length, dy / length, (x1 + x2) / 2.0, (y1 + y2) / 2.0
+
+
+def line_x_at_y(line, y):
+    vx, vy, x0, y0 = line
+    if abs(vy) < 1e-6:
+        return None
+    return x0 + vx * ((y - y0) / vy)
+
+
+def line_from_x_at_y(x_a, y_a, x_b, y_b):
+    return line_from_points(x_a, y_a, x_b, y_b)
+
+
+def draw_full_line(img, line, color=(0, 255, 0), thickness=3):
+    out = img.copy()
+    vx, vy, x0, y0 = line
+    t = 1000
+    x1 = int(x0 - vx * t)
+    y1 = int(y0 - vy * t)
+    x2 = int(x0 + vx * t)
+    y2 = int(y0 + vy * t)
+    cv2.line(out, (x1, y1), (x2, y2), color, thickness)
+    return out
+
+
+def make_line_candidate(line, w, h, border_margin=5):
+    x1, y1, x2, y2 = line[0]
+    length = line_length(x1, y1, x2, y2)
+    angle = line_angle(x1, y1, x2, y2)
+    vertical_error = angle_diff(angle, 90.0)
+    touches_border = near_border(x1, y1, w, h, border_margin) or near_border(x2, y2, w, h, border_margin)
+    fitted = line_from_points(x1, y1, x2, y2)
+    return {
+        "raw": line,
+        "points": (x1, y1, x2, y2),
+        "length": length,
+        "angle": angle,
+        "vertical_error": vertical_error,
+        "touches_border": touches_border,
+        "line": fitted,
+    }
+
+
+def choose_pole_centerline(
+    all_candidates,
+    img_shape,
+    min_top_width=6,
+    min_bottom_width=10,
+    max_bottom_width=110,
+    pair_angle_tol=18,
+    min_taper_px=2,
+    single_offset=28,
+):
+    h, w = img_shape[:2]
+    vertical = [c for c in all_candidates if c["vertical_error"] <= 35 and c["length"] >= 40]
+    border_seeds = [c for c in vertical if c["touches_border"]]
+    if not border_seeds:
+        return None, None, None
+
+    best_pair = None
+    best_score = -float("inf")
+
+    for seed in border_seeds:
+        seed_bottom = line_x_at_y(seed["line"], h - 1)
+        seed_top = line_x_at_y(seed["line"], 0)
+        if seed_bottom is None or seed_top is None:
+            continue
+
+        for other in vertical:
+            if other is seed:
+                continue
+            if angle_diff(seed["angle"], other["angle"]) > pair_angle_tol:
+                continue
+
+            other_bottom = line_x_at_y(other["line"], h - 1)
+            other_top = line_x_at_y(other["line"], 0)
+            if other_bottom is None or other_top is None:
+                continue
+
+            bottom_width = abs(seed_bottom - other_bottom)
+            top_width = abs(seed_top - other_top)
+            if bottom_width < min_bottom_width or bottom_width > max_bottom_width:
+                continue
+
+            if top_width < min_top_width:
+                continue
+
+            if bottom_width < top_width + min_taper_px:
+                continue
+
+            taper_score = min(30.0, bottom_width - top_width)
+            center_bottom = (seed_bottom + other_bottom) / 2.0
+            center_score = max(0.0, w / 2.0 - abs(center_bottom - w / 2.0))
+            score = seed["length"] + other["length"] + center_score * 0.5 + taper_score * 2.0
+
+            if score > best_score:
+                center_top = (seed_top + other_top) / 2.0
+                centerline = line_from_x_at_y(center_bottom, h - 1, center_top, 0)
+                best_score = score
+                best_pair = (centerline, seed, other)
+
+    if best_pair is not None:
+        return best_pair
+
+    seed = max(
+        border_seeds,
+        key=lambda c: c["length"] + max(0.0, w / 2.0 - abs(((c["points"][0] + c["points"][2]) / 2.0) - w / 2.0)) * 0.5,
+    )
+    seed_bottom = line_x_at_y(seed["line"], h - 1)
+    seed_top = line_x_at_y(seed["line"], 0)
+    if seed_bottom is None or seed_top is None:
+        return None, seed, None
+
+    inward = 1.0 if seed_bottom < w / 2.0 else -1.0
+    centerline = line_from_x_at_y(
+        seed_bottom + inward * single_offset,
+        h - 1,
+        seed_top + inward * single_offset,
+        0,
+    )
+    return centerline, seed, None
+
 
 def average_lines(lines, img_shape):
     """
@@ -73,6 +204,11 @@ def average_lines(lines, img_shape):
         x1, y1, x2, y2 = line[0]
         if x1 == x2 and y1 == y2:
             continue # Skip degenerate lines
+
+        angle = line_angle(x1, y1, x2, y2)
+        vertical_error = angle_diff(angle, 90.0)
+        if vertical_error > 35:
+            continue
             
         # Convert segment to polar coordinates (rho, theta)
         # We use standard math because cv2.HoughLinesP outputs segments, not polar representation
@@ -146,27 +282,30 @@ def detect_lines(frame):
         minLineLength=40,
         maxLineGap=20
     )
-
+    line_img = draw_lines(frame, lines)
     h, w, _ = frame.shape
-    candidates = []
-    for line in lines:
-        x1, y1, x2, y2 = line[0]
-        touches_border = near_border(x1, y1, w, h) or near_border(x2, y2, w, h)
-        if not touches_border:
-            continue
-        # check length
-        # get angle
-        candidates.append(line)
-    print(f"number of lines: {len(candidates)}")
-    
-    # show(draw_lines(frame, candidates))
-    line_img = draw_lines(frame, candidates)
-    # cv2.imshow("line image", line_img)
-    # cv2.waitKey(0)
+    all_candidates = []
+    if lines is not None:
+        all_candidates = [make_line_candidate(line, w, h, border_margin=5) for line in lines]
 
-    avg_line = average_lines(candidates, frame.shape)
-    if avg_line is not None:
-        line_img = draw_average_line(line_img, avg_line)
+    border_candidates = [candidate for candidate in all_candidates if candidate["touches_border"]]
+    centerline, seed, partner = choose_pole_centerline(all_candidates, frame.shape)
+    print(
+        f"raw lines: {0 if lines is None else len(lines)}, "
+        f"border seeds: {len(border_candidates)}, "
+        f"paired: {partner is not None}"
+    )
+
+    if seed is not None:
+        x1, y1, x2, y2 = seed["points"]
+        cv2.line(line_img, (x1, y1), (x2, y2), (0, 255, 0), 4)
+
+    if partner is not None:
+        x1, y1, x2, y2 = partner["points"]
+        cv2.line(line_img, (x1, y1), (x2, y2), (255, 0, 255), 4)
+
+    if centerline is not None:
+        line_img = draw_full_line(line_img, centerline, (0, 255, 255), 4)
 
     return line_img
 

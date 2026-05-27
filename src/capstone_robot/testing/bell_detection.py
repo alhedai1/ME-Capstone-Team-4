@@ -7,7 +7,8 @@ from capstone_robot.vision.bell2 import detect_bell
 
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp"}
-DEFAULT_IMAGE_FOLDER = Path(__file__).resolve().parent.parent / "data" / "extracted_frames" / "may25" / "may25_strike_bell"
+DEFAULT_IMAGE_FOLDER = Path(__file__).resolve().parent.parent / "data" / "extracted_frames" / "may25" / "may25_strike_bell5fps"
+# DEFAULT_IMAGE_FOLDER = Path(__file__).resolve().parent.parent / "data" / "extracted_frames" / "may15" / "bell1"
 
 
 def draw_result(img, result):
@@ -32,7 +33,7 @@ def main():
     parser.add_argument("folder", nargs="?", default=DEFAULT_IMAGE_FOLDER, help="Folder containing images")
     parser.add_argument("--out", help="Optional folder for annotated results")
     parser.add_argument("--show", action="store_true", help="Show each result; press q or Esc to stop")
-    parser.add_argument("--min-area-fraction", type=float, default=0.12, help="Minimum component area as frame fraction")
+    parser.add_argument("--min-area-fraction", type=float, default=0.32, help="Minimum component area as frame fraction")
     parser.add_argument("--min-width-fraction", type=float, default=0.35, help="Minimum bbox width as frame fraction")
     parser.add_argument("--min-height-fraction", type=float, default=0.28, help="Minimum bbox height as frame fraction")
     parser.add_argument("--max-orange-frame-fraction", type=float, default=0.22, help="Reject orange ball-dominant frames")

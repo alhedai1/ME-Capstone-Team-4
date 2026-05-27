@@ -359,8 +359,8 @@ def center_front_pole_for_climb(robot):
 
 
 def drive_forward_with_bias(robot, bias_side, seconds):
-    speed = setting(robot, "bell_circle_orbit_forward_speed", 0.35)
-    bias = setting(robot, "bell_circle_orbit_turn_bias", 0.12)
+    speed = setting(robot, "pole_bell_orbit_forward_speed", 0.35)
+    bias = setting(robot, "pole_bell_orbit_turn_bias", 0.12)
 
     if bias_side == "right":
         left_speed = speed + bias
@@ -384,11 +384,12 @@ def orbit_seconds_from_error(robot, error_px):
 
 
 def orbit_step(robot, bell_side, error_px):
-    reverse_speed = setting(robot, "bell_circle_reverse_speed", 0.25)
-    reverse_seconds = setting(robot, "bell_circle_reverse_seconds", 0.25)
-    turn_seconds = orbit_seconds_from_error(robot, error_px) * setting(robot, "pole_bell_turn_time_scale", 0.75)
+    reverse_speed = setting(robot, "pole_bell_reverse_speed", 0.25)
+    reverse_seconds = setting(robot, "pole_bell_reverse_seconds", 0.25)
+    # turn_seconds = orbit_seconds_from_error(robot, error_px) * setting(robot, "pole_bell_turn_time_scale", 0.75)
+    turn_seconds = setting(robot, "pole_bell_turn_seconds", 1.5)
     forward_seconds = orbit_seconds_from_error(robot, error_px)
-    settle_seconds = setting(robot, "bell_circle_settle_seconds", 0.15)
+    settle_seconds = setting(robot, "pole_bell_settle_seconds", 0.15)
     turn_speed = setting(robot, "align_turn_speed", 0.3)
 
     print(
@@ -410,7 +411,7 @@ def run(robot):
     if aligning_controls:
         robot.pi_camera.picam2.set_controls(aligning_controls)
 
-    max_steps = setting(robot, "bell_circle_max_orbit_steps", 20)
+    max_steps = setting(robot, "pole_bell_max_orbit_steps", 20)
     get_pole_bell_tracker(robot).reset()
 
     if not center_front_pole(robot, label="PREALIGN"):

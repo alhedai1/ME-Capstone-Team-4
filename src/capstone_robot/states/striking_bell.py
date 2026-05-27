@@ -62,18 +62,20 @@ def strike_once(robot):
 
 def run(robot):
     print("[STATE] Bell within reach! Striking...")
-    robot.motors.stop()
+    # robot.motors.stop()
+    robot.motors.forward(robot.climb_hold_speed)
     robot.bell_tracker.reset()
     robot.pi_camera.picam2.set_controls(striking_controls)
 
-    if wait_for_bell(robot):
-        strike_once(robot)
+    while True:
+        if wait_for_bell(robot):
+            strike_once(robot)
 
-    time.sleep(3.0)
-    robot.bell_tracker.reset()
+        time.sleep(3.0)
+        robot.bell_tracker.reset()
 
-    if wait_for_bell(robot):
-        strike_once(robot)
+        # if wait_for_bell(robot):
+        #     strike_once(robot)
 
     robot.servo.detach()
 

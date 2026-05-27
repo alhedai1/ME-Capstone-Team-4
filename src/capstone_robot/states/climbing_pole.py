@@ -121,7 +121,7 @@ def attach_to_pole(robot):
     robot.motors.forward(robot.climb_attach_speed)
     time.sleep(robot.climb_attach_seconds)
     robot.motors.stop()
-    time.sleep(0.2)
+    time.sleep(robot.start_climb_settle_seconds)
 
 
 def climb_until_bell(robot):
@@ -135,7 +135,8 @@ def climb_until_bell(robot):
             return False
 
         ok, frame = robot.pi_camera.read()
-        if not ok or frame is None:
+        # climb a bit before checking for bell
+        if (time.time() - started_at <= 5) or not ok or frame is None:
             seen_frames = 0
             robot.motors.forward(robot.climb_speed)
             print("[CLIMB] No Pi camera frame; continuing climb")
@@ -152,11 +153,14 @@ def climb_until_bell(robot):
             continue
 
         seen_frames += 1
-        robot.motors.stop()
+        # robot.motors.stop()
         print(f"[CLIMB] Bell detected ({seen_frames}/{robot.climb_bell_stable_frames_required})")
         update_bell_preview(robot, frame, bell, f"CLIMB: BELL {seen_frames}")
 
         if seen_frames >= robot.climb_bell_stable_frames_required:
+            # continue a bit more, then hold position
+            time.sleep(1)
+            robot.motors.forward(robot.climb_hold_speed)
             return True
 
         time.sleep(0.05)
@@ -175,7 +179,7 @@ def run(robot):
         print(f"[CLIMB] Climbing at speed={robot.climb_speed:.2f}")
         if climb_until_bell(robot):
             # robot.motors.stop() # run motors at ~0.5 to hold position after detecting bell
-            robot.motors.forward(0.4)
+            robot.motors.forward(robot.climb_hold_speed)
             robot.bell_detected()
         elif robot.state == "climbing_pole":
             robot.climb_failed()
