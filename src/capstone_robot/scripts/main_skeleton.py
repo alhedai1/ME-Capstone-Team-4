@@ -281,9 +281,9 @@ if __name__ == "__main__":
         robot.approach_pole()
         # robot.run_robot()
         # robot.state = 'aligning_bell'
-        robot.align_to_bell()
+        # robot.align_to_bell()
         # robot.state = "climbing_pole"
-        robot.climb_pole()
+        # robot.climb_pole()
         # robot.state = "striking_bell"
         # robot.strike_bell()
     finally:
