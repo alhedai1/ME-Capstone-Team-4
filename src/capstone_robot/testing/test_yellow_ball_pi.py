@@ -81,14 +81,31 @@ def draw_detection(frame_bgr, detection, fps):
     return vis
 
 
+def build_preview(frame_bgr, detection, mask, fps, debug_mask):
+    vis = draw_detection(frame_bgr, detection, fps)
+    if not debug_mask:
+        return vis
+
+    mask_bgr = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    cv2.putText(mask_bgr, "MASK", (15, 32), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2, cv2.LINE_AA)
+    return np.hstack((vis, mask_bgr))
+
+
 def main():
     parser = argparse.ArgumentParser(description="Track a yellow ball from the Pi camera in a browser preview.")
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--rotate", choices=["none", "cw", "ccw", "180"], default="none")
-    parser.add_argument("--min-area", type=int, default=10000)
+    parser.add_argument("--min-area", type=int, default=2000)
     parser.add_argument("--max-area", type=int, default=100000)
+    parser.add_argument(
+        "--camera-format",
+        choices=["rgb", "bgr"],
+        default="rgb",
+        help="Picamera2 RGB888 normally returns rgb; try bgr if the mask misses obvious yellow.",
+    )
+    parser.add_argument("--debug-mask", action="store_true", help="show the threshold mask beside the camera view")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=1234)
     parser.add_argument("--preview-width", type=int, default=640)
@@ -112,14 +129,17 @@ def main():
                 time.sleep(0.05)
                 continue
 
-            frame_rgb = rotate_frame(frame_rgb, args.rotate)
-            frame_bgr = cv2.cvtColor(frame_rgb, cv2.COLOR_RGB2BGR)
+            frame = rotate_frame(frame_rgb, args.rotate)
+            if args.camera_format == "rgb":
+                frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            else:
+                frame_bgr = frame
 
             detection, mask = detect_yellow_ball(frame_bgr, args.min_area, args.max_area)
             frame_count += 1
             fps = frame_count / max(1e-6, time.time() - started_at)
 
-            vis = draw_detection(frame_bgr, detection, fps)
+            vis = build_preview(frame_bgr, detection, mask, fps, args.debug_mask)
             preview.update(resize_preview(vis, args.preview_width))
 
             if args.show:
