@@ -29,6 +29,80 @@ def update_bell_preview(robot, frame, bell, status):
     robot.update_preview(vis)
 
 
+def approach_front_pole(robot):
+    close_frames = 0
+    missed_frames = 0
+    smoothed_box = None
+    last_left_speed = 0.0
+    last_right_speed = 0.0
+
+    while robot.state == "aligning_bell":
+        frame, pole = robot.detect_pole()
+        if frame is None:
+            print("[ALIGN-CIRCLE] No AI camera frame/metadata received")
+            robot.motors.stop()
+            time.sleep(0.1)
+            continue
+
+        if pole is None:
+            missed_frames += 1
+            close_frames = 0
+            smoothed_box = None
+            print(f"[ALIGN-CIRCLE] Pole lost while re-approaching ({missed_frames})")
+            update_front_preview(robot, frame, None, f"REAPPROACH: LOST {missed_frames}")
+
+            if missed_frames <= setting(robot, "approach_hold_frame_limit", 3):
+                robot.drive(last_left_speed, last_right_speed)
+            else:
+                robot.motors.right(setting(robot, "search_turn_speed", 0.3))
+
+            time.sleep(0.05)
+            continue
+
+        missed_frames = 0
+        smoothed_box = smooth_box(smoothed_box, pole.box, setting(robot, "pole_smooth_alpha", 1.0))
+        pole.box = smoothed_box
+
+        x, y, w, h = pole.box
+        frame_width = frame.shape[1]
+        error_x = (x + w / 2.0) - (frame_width / 2.0)
+        width_fraction = w / frame_width
+
+        if width_fraction >= setting(robot, "approach_stop_width_fraction", 0.16):
+            close_frames += 1
+            robot.motors.stop()
+            print(
+                f"[ALIGN-CIRCLE] Reached pole distance "
+                f"({close_frames}/{setting(robot, 'approach_stop_frames_required', 3)}), "
+                f"width={width_fraction:.2f}, error_x={error_x:.1f}px"
+            )
+            update_front_preview(robot, frame, pole, f"REAPPROACH: CLOSE {width_fraction:.2f}")
+
+            if close_frames >= setting(robot, "approach_stop_frames_required", 3):
+                return True
+
+            time.sleep(0.05)
+            continue
+
+        close_frames = 0
+        normalized_error = error_x / (frame_width / 2.0)
+        steering = max(-0.5, min(0.5, normalized_error * setting(robot, "approach_steer_gain", 0.5)))
+        speed = setting(robot, "approach_speed", 0.4)
+        left_speed = speed + steering
+        right_speed = speed - steering
+        last_left_speed = left_speed
+        last_right_speed = right_speed
+
+        robot.drive(left_speed, right_speed)
+        print(
+            f"[ALIGN-CIRCLE] Re-approaching pole, width={width_fraction:.2f}, "
+            f"error_x={error_x:.1f}px, left={left_speed:.2f}, right={right_speed:.2f}"
+        )
+        update_front_preview(robot, frame, pole, f"REAPPROACH: width={width_fraction:.2f}")
+        time.sleep(0.05)
+
+    return False
+
 def center_front_pole(robot):
     stable_frames = 0
     last_pole = None
@@ -173,6 +247,8 @@ def run(robot):
     robot.pi_camera.picam2.set_controls(striking_controls)
     try:
         robot.bell_tracker.reset()
+        center_front_pole(robot)
+        approach_front_pole(robot)
         center_front_pole(robot)
         attach_to_pole(robot)
 

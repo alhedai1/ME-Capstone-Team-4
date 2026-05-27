@@ -278,7 +278,7 @@ def wait_for_pole_bell_alignment(robot):
                 f"({missed_frames}/{setting(robot, 'alignment_missed_frame_limit', 15)})"
             )
             update_alignment_preview(robot, frame, None, f"ALIGN: LOST {missed_frames}")
-            time.sleep(0.05)
+            time.sleep(5)
             continue
 
         missed_frames = 0
@@ -408,8 +408,8 @@ def orbit_step(robot, bell_side, error_px):
 
 
 def run(robot):
-    if aligning_controls:
-        robot.pi_camera.picam2.set_controls(aligning_controls)
+    # if aligning_controls:
+    #     robot.pi_camera.picam2.set_controls(aligning_controls)
 
     max_steps = setting(robot, "pole_bell_max_orbit_steps", 20)
     get_pole_bell_tracker(robot).reset()
