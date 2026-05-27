@@ -39,6 +39,7 @@ def parse_args():
         default=None,
         help="full output video path; overrides positional filename",
     )
+    parser.add_argument("--idx", type=int, default=0)
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
     parser.add_argument("--fps", type=float, default=30)
@@ -88,7 +89,7 @@ def main():
     args = parse_args()
 
     try:
-        camera = PiCamera(0, args.width, args.height, args.fps)
+        camera = PiCamera(args.idx, args.width, args.height, args.fps)
     except RuntimeError as exc:
         raise SystemExit(str(exc))
 

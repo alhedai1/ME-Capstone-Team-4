@@ -8,7 +8,8 @@ import math
 # CHAT: FIX YELLOW BALL FALSE POSITIVES
 
 
-IMG_FOLDER = Path("../data/extracted_frames/may25/may25_strike_bell5fps")
+# IMG_FOLDER = Path("../data/extracted_frames/may25/may25_strike_bell5fps")
+IMG_FOLDER = Path("../data/extracted_frames/may27/bell_strike_controls")
 # IMG_FOLDER = Path("../data/extracted_frames/may15/bell1")
 # Filter to ensure we only try to read files, skipping directories
 IMG_PATHS = [path for path in IMG_FOLDER.iterdir() if path.is_file()]
@@ -98,12 +99,120 @@ def detect_yellow_ball(path):
     return out, (x, y, r), mask
 
 
-for path in IMG_PATHS:
-    # detect_bell_adaptive(path)
-    out, circle, mask = detect_yellow_ball(path)
-    if circle:
-        (x,y,r) = circle
-        print(f"area: {math.pi*r*r}")
-    cv2.imshow("img", out)
-    cv2.imshow("mask", mask)
-    cv2.waitKey(0)
+# for path in IMG_PATHS:
+#     # detect_bell_adaptive(path)
+#     out, circle, mask = detect_yellow_ball(path)
+#     if circle:
+#         (x,y,r) = circle
+#         print(f"area: {math.pi*r*r}")
+#     cv2.imshow("img", out)
+#     cv2.imshow("mask", mask)
+#     cv2.waitKey(0)
+
+import cv2
+import numpy as np
+import math
+
+def detect_yellow_ball(frame):
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+    # Broad warm-color range: yellow/orange/brown-ish
+    lower = np.array([0, 40, 40])
+    upper = np.array([35, 255, 255])
+    
+    mask = cv2.inRange(hsv, lower, upper)
+    
+    # Ignore very dark pixels and very white/washed-out pixels
+    h, s, v = cv2.split(hsv)
+    mask = cv2.bitwise_and(mask, cv2.inRange(s, 50, 255))
+    mask = cv2.bitwise_and(mask, cv2.inRange(v, 50, 255))
+    
+    # Clean noise
+    kernel = np.ones((9, 9), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+    
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    candidates = []
+    
+    for c in contours:
+        area = cv2.contourArea(c)
+        if area < 10000 or area > 100000:
+            continue
+            
+        x, y, w, h = cv2.boundingRect(c)
+        aspect = w / h
+        if not 0.75 <= aspect <= 1.33:
+            continue
+            
+        perimeter = cv2.arcLength(c, True)
+        if perimeter == 0:
+            continue
+        circularity = 4 * np.pi * area / (perimeter * perimeter)
+        
+        (x, y), r = cv2.minEnclosingCircle(c)
+        circle_area = np.pi * r * r
+        fill_ratio = area / circle_area if circle_area > 0 else 0
+        
+        hull = cv2.convexHull(c)
+        hull_area = cv2.contourArea(hull)
+        solidity = area / hull_area if hull_area > 0 else 0
+        if solidity < 0.75:
+            continue
+            
+        score = (
+            2.0 * fill_ratio + 1.5 * solidity + 
+            1.0 * (1.0 - abs(aspect - 1.0)) - 0.00001 * area
+        )
+        
+        if circularity > 0.45 and fill_ratio > 0.45 and r > 20:
+            candidates.append((score, area, int(x), int(y), int(r), circularity, fill_ratio))
+            
+    if not candidates:
+        # If mask returns empty, make it a 3-channel image for stacking
+        return frame, None, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+        
+    candidates.sort()
+    score, _, x, y, r, circularity, fill_ratio = candidates[0]
+    
+    out = frame.copy()
+    cv2.circle(out, (x, y), r, (255, 0, 0), 2)
+    
+    # Convert mask to 3 channels so it stacks perfectly with the color frame
+    mask_colored = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+    return out, (x, y, r), mask_colored
+
+def process_video(video_path):
+    cap = cv2.VideoCapture(video_path)
+    
+    if not cap.isOpened():
+        print(f"Error: Cannot open video {video_path}")
+        return
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # Run your detection function on the current frame
+        out_frame, circle, mask_frame = detect_yellow_ball(frame)
+        
+        if circle:
+            x, y, r = circle
+            # Print radius / calculated area if needed
+            # print(f"Area: {math.pi * r * r}")
+        
+        # Combine the original with detection and mask into a single window
+        combined_window = np.hstack((out_frame, mask_frame))
+        
+        cv2.imshow("Detection (Left) | Mask Output (Right)", combined_window)
+        
+        # Press 'q' to exit early (1ms delay between frames)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+            
+    cap.release()
+    cv2.destroyAllWindows()
+
+# Run the video processor
+process_video("../data/videos/may27/bell_strike_controls.mp4")
