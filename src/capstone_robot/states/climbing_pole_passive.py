@@ -109,6 +109,7 @@ def run(robot):
 
             if phase == "climb":
                 if detection is None:
+                    time.sleep(2)
                     hit_count += 1
                     last_gone_at = now
                     phase = "descend"
