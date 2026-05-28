@@ -36,8 +36,8 @@ from time import sleep
 from gpiozero import Robot
 
 # Motor driver pins
-LEFT_LPWM = "BOARD7"
-LEFT_RPWM = "BOARD11"
+LEFT_LPWM = "BOARD18"
+LEFT_RPWM = "BOARD16"
 RIGHT_LPWM = "BOARD35"
 RIGHT_RPWM = "BOARD12"
 

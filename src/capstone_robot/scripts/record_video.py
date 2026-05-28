@@ -15,6 +15,7 @@ from utils import *
 REPO_ROOT = find_repo_root(__file__)
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "src/capstone_robot/data/test_videos"
 DEFAULT_OUTPUT = DEFAULT_OUTPUT_DIR / "recording.mp4"
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole_imx/network.rpk"
 
 
 def output_path_from_name(name):
@@ -29,6 +30,13 @@ def output_path_from_name(name):
 def parse_args():
     parser = argparse.ArgumentParser(description="Record video from the Raspberry Pi Camera")
     parser.add_argument(
+        "--camera",
+        choices=["pi", "ai"],
+        default="pi",
+        help="camera source to record; use ai to match climbing_pole_passive",
+    )
+    parser.add_argument("--model", type=Path, default=DEFAULT_MODEL, help="IMX500 .rpk model path for --camera ai")
+    parser.add_argument(
         "name",
         nargs="?",
         help="output filename saved under data/test_videos; .mp4 is added if omitted",
@@ -42,7 +50,12 @@ def parse_args():
     parser.add_argument("--idx", type=int, default=0)
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
-    parser.add_argument("--fps", type=float, default=30)
+    parser.add_argument(
+        "--fps",
+        type=float,
+        default=None,
+        help="camera/video framerate; defaults to 30 for pi and 15 for ai",
+    )
     parser.add_argument("--rotate", choices=["none", "cw", "ccw", "180"], default="none")
     parser.add_argument("--show", action="store_true", help="show preview window")
     parser.add_argument("--preview-port", type=int, default=1234, help="serve browser preview on this port")
@@ -51,6 +64,8 @@ def parse_args():
     args = parser.parse_args()
     if args.output is None:
         args.output = output_path_from_name(args.name) if args.name else DEFAULT_OUTPUT
+    if args.fps is None:
+        args.fps = 15 if args.camera == "ai" else 30
     return args
 
 
@@ -89,7 +104,17 @@ def main():
     args = parse_args()
 
     try:
-        camera = PiCamera(args.idx, args.width, args.height, args.fps)
+        if args.camera == "ai":
+            camera = AiCamera(
+                model_path=args.model,
+                width=args.width,
+                height=args.height,
+                fps=args.fps,
+                bbox_normalization=True,
+                bbox_order="xy",
+            )
+        else:
+            camera = PiCamera(args.idx, args.width, args.height, args.fps)
     except RuntimeError as exc:
         raise SystemExit(str(exc))
 
@@ -112,7 +137,10 @@ def main():
     frame_number = 0
     try:
         while True:
-            ok, frame = camera.read()
+            if args.camera == "ai":
+                ok, frame, _metadata = camera.read()
+            else:
+                ok, frame = camera.read()
             if not ok or frame is None:
                 print("No frame received; stopping.")
                 break
