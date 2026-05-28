@@ -2,7 +2,7 @@ import time
 
 import cv2
 
-from capstone_robot.utils import rotate_frame
+from capstone_robot.utils import FixedRateLoop, rotate_frame
 from capstone_robot.vision.pole_bell2 import PoleBellTracker
 
 try:
@@ -18,7 +18,6 @@ if controls is not None:
         "AwbMode": controls.AwbModeEnum.Daylight,
         "ExposureValue": -1.5,
     }
-    print("GOT ALIGNING CONTROLS")
 else:
     aligning_controls = {}
 
@@ -75,11 +74,38 @@ def smooth_box(old_box, new_box, alpha):
     return tuple(int(alpha * new + (1.0 - alpha) * old) for old, new in zip(old_box, new_box))
 
 
+def opposite_direction(direction):
+    return "left" if direction == "right" else "right"
+
+
+def alternating_search_direction(missed_frames, initial_direction, sweep_frames):
+    direction = initial_direction if initial_direction in ("left", "right") else "right"
+    sweep_frames = max(1, int(sweep_frames))
+    remaining = max(0, missed_frames - 1)
+    segment = 0
+
+    while True:
+        segment_length = (segment + 1) * sweep_frames
+        if remaining < segment_length:
+            break
+        remaining -= segment_length
+        segment += 1
+
+    if segment % 2 == 1:
+        direction = opposite_direction(direction)
+
+    return direction, segment + 1
+
+
 def get_pole_bell_tracker(robot):
     tracker = getattr(robot, "pole_bell_tracker", None)
     if tracker is None or tracker.__class__.__module__ != "capstone_robot.vision.pole_bell2":
-        tracker = PoleBellTracker(color_format="rgb")
+        tracker = PoleBellTracker(
+            color_format="rgb",
+            error_smooth_alpha=setting(robot, "pole_bell_error_smooth_alpha", 0.45),
+        )
         robot.pole_bell_tracker = tracker
+    tracker.error_smooth_alpha = setting(robot, "pole_bell_error_smooth_alpha", 0.45)
     return tracker
 
 
@@ -92,17 +118,20 @@ def read_upward_alignment(robot, rotation="180"):
     return frame, get_pole_bell_tracker(robot).detect(frame)
 
 
-def center_front_pole(robot, label="CENTER", search_direction="right"):
+def center_front_pole(robot, label="CENTER", search_direction="right", search_sweep_frames=None):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     stable_frames = 0
     missed_frames = 0
     last_pole = None
     last_motor_action = None
     smoothed_box = None
+    last_center_error_x = None
+    last_center_time = None
 
     while robot.state == "aligning_bell":
         frame, pole = robot.detect_pole()
         if frame is None:
-            print("[ALIGN-CIRCLE] No AI camera frame/metadata received")
+            robot.log("[ALIGN-CIRCLE] No AI camera frame/metadata received")
             robot.motors.stop()
             time.sleep(0.1)
             continue
@@ -111,7 +140,7 @@ def center_front_pole(robot, label="CENTER", search_direction="right"):
             missed_frames += 1
 
             if last_pole is not None and missed_frames <= setting(robot, "search_missed_frame_limit", 6):
-                print(
+                robot.log(
                     f"[ALIGN-CIRCLE] Front pole briefly lost "
                     f"({missed_frames}/{setting(robot, 'search_missed_frame_limit', 6)}); "
                     "holding last centering action"
@@ -125,23 +154,42 @@ def center_front_pole(robot, label="CENTER", search_direction="right"):
                 else:
                     robot.motors.stop()
 
-                time.sleep(0.05)
+                loop.sleep()
                 continue
 
             stable_frames = 0
             last_pole = None
             smoothed_box = None
-            print(
-                f"[ALIGN-CIRCLE] Front pole not detected; rotating {search_direction} slowly "
-                f"({missed_frames})"
+            last_center_error_x = None
+            last_center_time = None
+            sweep_frames = (
+                setting(robot, "pole_search_sweep_frames", 12)
+                if search_sweep_frames is None
+                else search_sweep_frames
+            )
+            current_search_direction, sweep = alternating_search_direction(
+                missed_frames,
+                search_direction,
+                sweep_frames,
+            )
+            robot.log(
+                f"[ALIGN-CIRCLE] Front pole not detected; sweep {sweep}, "
+                f"rotating {current_search_direction} slowly ({missed_frames})"
             )
             update_front_preview(robot, frame, None, f"{label}: NO POLE {missed_frames}")
-            if search_direction == "left":
+            if current_search_direction == "left":
                 robot.motors.left(setting(robot, "search_turn_speed", 0.3))
             else:
                 robot.motors.right(setting(robot, "search_turn_speed", 0.3))
-            time.sleep(0.05)
+            loop.sleep()
             continue
+
+        width_fraction = pole_width_fraction(pole, frame)
+        height_fraction = pole_height_fraction(pole, frame)
+
+        if width_fraction < setting(robot, "align_min_pole_width_fraction", 0.08):
+            robot.log(f"[ALIGN-CIRCLE] Rejecting small pole width={width_fraction:.2f}")
+            pole = None
 
         missed_frames = 0
         smoothed_box = smooth_box(smoothed_box, pole.box, setting(robot, "pole_smooth_alpha", 1.0))
@@ -154,8 +202,10 @@ def center_front_pole(robot, label="CENTER", search_direction="right"):
         if abs(error_x) <= setting(robot, "pole_center_deadband_px", 20):
             stable_frames += 1
             last_motor_action = "stop"
+            last_center_error_x = None
+            last_center_time = None
             robot.motors.stop()
-            print(
+            robot.log(
                 f"[ALIGN-CIRCLE] Front pole centered "
                 f"({stable_frames}/{setting(robot, 'pole_stable_frames_required', 5)}), "
                 f"error_x={error_x:.1f}px"
@@ -166,23 +216,30 @@ def center_front_pole(robot, label="CENTER", search_direction="right"):
                 return True
         else:
             stable_frames = 0
+            now = time.monotonic()
+            dt = None if last_center_time is None else now - last_center_time
+            turn_speed = robot.center_turn_speed_for_error(error_x, frame.shape[1], last_center_error_x, dt)
+            last_center_error_x = error_x
+            last_center_time = now
+
             if error_x < 0:
-                print(f"[ALIGN-CIRCLE] Front pole left of center, error_x={error_x:.1f}px")
+                robot.log(f"[ALIGN-CIRCLE] Front pole left of center, error_x={error_x:.1f}px, turn={turn_speed:.2f}")
                 update_front_preview(robot, frame, pole, f"{label}: LEFT {error_x:.1f}")
                 last_motor_action = "left"
-                robot.motors.left(setting(robot, "center_turn_speed", 0.3))
+                robot.motors.left(turn_speed)
             else:
-                print(f"[ALIGN-CIRCLE] Front pole right of center, error_x={error_x:.1f}px")
+                robot.log(f"[ALIGN-CIRCLE] Front pole right of center, error_x={error_x:.1f}px, turn={turn_speed:.2f}")
                 update_front_preview(robot, frame, pole, f"{label}: RIGHT {error_x:.1f}")
                 last_motor_action = "right"
-                robot.motors.right(setting(robot, "center_turn_speed", 0.3))
+                robot.motors.right(turn_speed)
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 
 
 def approach_front_pole(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     close_frames = 0
     missed_frames = 0
     smoothed_box = None
@@ -192,7 +249,7 @@ def approach_front_pole(robot):
     while robot.state == "aligning_bell":
         frame, pole = robot.detect_pole()
         if frame is None:
-            print("[ALIGN-CIRCLE] No AI camera frame/metadata received")
+            robot.log("[ALIGN-CIRCLE] No AI camera frame/metadata received")
             robot.motors.stop()
             time.sleep(0.1)
             continue
@@ -201,7 +258,7 @@ def approach_front_pole(robot):
             missed_frames += 1
             close_frames = 0
             smoothed_box = None
-            print(f"[ALIGN-CIRCLE] Pole lost while re-approaching ({missed_frames})")
+            robot.log(f"[ALIGN-CIRCLE] Pole lost while re-approaching ({missed_frames})")
             update_front_preview(robot, frame, None, f"REAPPROACH: LOST {missed_frames}")
 
             if missed_frames <= setting(robot, "approach_hold_frame_limit", 3):
@@ -209,7 +266,7 @@ def approach_front_pole(robot):
             else:
                 robot.motors.right(setting(robot, "search_turn_speed", 0.3))
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         missed_frames = 0
@@ -224,7 +281,7 @@ def approach_front_pole(robot):
         if width_fraction >= setting(robot, "approach_stop_width_fraction", 0.16):
             close_frames += 1
             robot.motors.stop()
-            print(
+            robot.log(
                 f"[ALIGN-CIRCLE] Reached pole distance "
                 f"({close_frames}/{setting(robot, 'approach_stop_frames_required', 3)}), "
                 f"width={width_fraction:.2f}, error_x={error_x:.1f}px"
@@ -234,7 +291,7 @@ def approach_front_pole(robot):
             if close_frames >= setting(robot, "approach_stop_frames_required", 3):
                 return True
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         close_frames = 0
@@ -247,17 +304,18 @@ def approach_front_pole(robot):
         last_right_speed = right_speed
 
         robot.drive(left_speed, right_speed)
-        print(
+        robot.log(
             f"[ALIGN-CIRCLE] Re-approaching pole, width={width_fraction:.2f}, "
             f"error_x={error_x:.1f}px, left={left_speed:.2f}, right={right_speed:.2f}"
         )
         update_front_preview(robot, frame, pole, f"REAPPROACH: width={width_fraction:.2f}")
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 
 
 def wait_for_pole_bell_alignment(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     stable_frames = 0
     missed_frames = 0
 
@@ -265,7 +323,7 @@ def wait_for_pole_bell_alignment(robot):
         frame, alignment = read_upward_alignment(robot)
         if frame is None:
             robot.motors.stop()
-            print("[ALIGN-CIRCLE] No upward camera frame received")
+            robot.log("[ALIGN-CIRCLE] No upward camera frame received")
             time.sleep(0.1)
             continue
 
@@ -273,20 +331,20 @@ def wait_for_pole_bell_alignment(robot):
             missed_frames += 1
             stable_frames = 0
             robot.motors.stop()
-            print(
+            robot.log(
                 f"[ALIGN-CIRCLE] Need pole+bell alignment "
                 f"({missed_frames}/{setting(robot, 'alignment_missed_frame_limit', 15)})"
             )
             update_alignment_preview(robot, frame, None, f"ALIGN: LOST {missed_frames}")
             if missed_frames >= setting(robot, "alignment_missed_frame_limit", 15):
-                print("[ALIGN-CIRCLE] Pole+bell alignment lost too long; recentering front pole")
+                robot.log("[ALIGN-CIRCLE] Pole+bell alignment lost too long; recentering front pole")
                 get_pole_bell_tracker(robot).reset()
                 if not center_front_pole(robot, label="ALIGN RECOVER"):
                     return None, None
                 get_pole_bell_tracker(robot).reset()
                 missed_frames = 0
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         missed_frames = 0
@@ -296,7 +354,7 @@ def wait_for_pole_bell_alignment(robot):
         if abs(error) <= threshold:
             stable_frames += 1
             robot.motors.stop()
-            print(
+            robot.log(
                 f"[ALIGN-CIRCLE] Pole and bell aligned "
                 f"({stable_frames}/{setting(robot, 'alignment_stable_frames_required', 4)}), "
                 f"error={error:.1f}px"
@@ -307,11 +365,11 @@ def wait_for_pole_bell_alignment(robot):
                 return "aligned", 0.0
         else:
             side = alignment.side
-            print(f"[ALIGN-CIRCLE] Pole/bell error={error:.1f}px, bell side={side}")
+            robot.log(f"[ALIGN-CIRCLE] Pole/bell error={error:.1f}px, bell side={side}")
             update_alignment_preview(robot, frame, alignment, f"ALIGN: {side} err={error:.1f}")
             return side, error
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return None, None
 
@@ -322,6 +380,7 @@ def wait_for_bell_side(robot):
 
 
 def orbit_until_bell_aligned(robot, rotation="180"):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     stable_frames = 0
     missed_frames = 0
 
@@ -331,12 +390,12 @@ def orbit_until_bell_aligned(robot, rotation="180"):
             missed_frames += 1
             stable_frames = 0
             robot.motors.stop()
-            print(
+            robot.log(
                 f"[ALIGN-CIRCLE] Lost pole/bell while orbiting "
                 f"({missed_frames}/{setting(robot, 'alignment_missed_frame_limit', 15)})"
             )
             update_alignment_preview(robot, frame, None, f"ORBIT: LOST {missed_frames}")
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         missed_frames = 0
@@ -353,14 +412,22 @@ def orbit_until_bell_aligned(robot, rotation="180"):
             stable_frames = 0
             side = alignment.side
             duration = orbit_seconds_from_error(robot, error)
-            print(f"[ALIGN-CIRCLE] Orbit correction side={side}, error={error:.1f}px, duration={duration:.2f}s")
+            robot.log(f"[ALIGN-CIRCLE] Orbit correction side={side}, error={error:.1f}px, duration={duration:.2f}s")
             drive_forward_with_bias(robot, robot.opposite_direction(side), duration)
             get_pole_bell_tracker(robot).reset()
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 
+def pole_width_fraction(pole, frame):
+    x, y, w, h = pole.box
+    return w / float(frame.shape[1])
+
+
+def pole_height_fraction(pole, frame):
+    x, y, w, h = pole.box
+    return h / float(frame.shape[0])
 
 def center_front_pole_for_climb(robot):
     return center_front_pole(robot, label="FINAL CENTER")
@@ -400,7 +467,7 @@ def orbit_step(robot, bell_side, error_px):
     settle_seconds = setting(robot, "pole_bell_settle_seconds", 0.15)
     turn_speed = setting(robot, "align_turn_speed", 0.3)
 
-    print(
+    robot.log(
         f"[ALIGN-CIRCLE] Orbit step side={bell_side}, error={error_px:.1f}px, "
         f"turn={turn_seconds:.2f}s, forward={forward_seconds:.2f}s"
     )
@@ -435,12 +502,17 @@ def run(robot):
                 robot.aligned()
             return
 
-        print(f"[ALIGN-CIRCLE] Orbit iteration {step}/{max_steps}, side={side}, error={error:.1f}px")
+        robot.log(f"[ALIGN-CIRCLE] Orbit iteration {step}/{max_steps}, side={side}, error={error:.1f}px")
         orbit_step(robot, side, error)
 
         search_direction = robot.opposite_direction(side)
         get_pole_bell_tracker(robot).reset()
-        if not center_front_pole(robot, label="RECENTER", search_direction=search_direction):
+        if not center_front_pole(
+            robot,
+            label="RECENTER",
+            search_direction=search_direction,
+            search_sweep_frames=setting(robot, "pole_recenter_search_sweep_frames", 60),
+        ):
             return
 
         if not approach_front_pole(robot):
@@ -449,4 +521,4 @@ def run(robot):
         get_pole_bell_tracker(robot).reset()
 
     robot.motors.stop()
-    print(f"[ALIGN-CIRCLE] Pole and bell did not align after {max_steps} orbit steps")
+    robot.log(f"[ALIGN-CIRCLE] Pole and bell did not align after {max_steps} orbit steps")

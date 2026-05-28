@@ -2,7 +2,7 @@ import time
 
 import cv2
 
-from capstone_robot.utils import rotate_frame
+from capstone_robot.utils import FixedRateLoop, rotate_frame
 from libcamera import controls
 
 aligning_controls = {
@@ -57,6 +57,7 @@ def read_upward_alignment(robot, rotation="180"):
 
 
 def wait_for_bell_side(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     missed_frames = 0
     aligned_frames = 0
 
@@ -68,7 +69,7 @@ def wait_for_bell_side(robot):
             robot.motors.stop()
             print(f"[ALIGN] Need pole and bell ({missed_frames}/{robot.alignment_missed_frame_limit})")
             update_alignment_preview(robot, frame, None, f"ALIGN: NEED POLE/BELL {missed_frames}")
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         if abs(alignment.error_px) <= robot.alignment_error_threshold_px:
@@ -83,7 +84,7 @@ def wait_for_bell_side(robot):
             if aligned_frames >= robot.alignment_stable_frames_required:
                 return "aligned"
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         print(f"[ALIGN] Bell is on the {alignment.side}, error={alignment.error_px:.1f}px")
@@ -94,6 +95,7 @@ def wait_for_bell_side(robot):
 
 
 def orbit_until_bell_aligned(robot, rotation="180"):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     stable_frames = 0
     missed_frames = 0
 
@@ -105,7 +107,7 @@ def orbit_until_bell_aligned(robot, rotation="180"):
             robot.motors.stop()
             print(f"[ALIGN] Lost pole/bell while orbiting ({missed_frames}/{robot.alignment_missed_frame_limit})")
             update_alignment_preview(robot, frame, None, f"ORBIT: LOST {missed_frames}")
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         missed_frames = 0
@@ -128,12 +130,13 @@ def orbit_until_bell_aligned(robot, rotation="180"):
             print(f"[ALIGN] Orbiting, side={alignment.side}, error={error:.1f}px")
             update_alignment_preview(robot, frame, alignment, f"ORBIT: error={error:.1f}")
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 
 
 def center_front_pole_for_climb(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     stable_frames = 0
 
     while robot.state == "aligning_bell":
@@ -149,7 +152,7 @@ def center_front_pole_for_climb(robot):
             print("[ALIGN] Front pole not detected; rotating right slowly")
             update_front_preview(robot, frame, None, "FRONT: NO POLE")
             robot.motors.right(robot.search_turn_speed)
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         x, y, w, h = pole.box
@@ -177,7 +180,7 @@ def center_front_pole_for_climb(robot):
                 print(f"[ALIGN] Front pole right of center, error_x={error_x:.1f}px")
                 update_front_preview(robot, frame, pole, f"FRONT: RIGHT {error_x:.1f}")
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 

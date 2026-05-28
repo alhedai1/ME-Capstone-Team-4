@@ -2,6 +2,8 @@ import time
 
 import cv2
 
+from capstone_robot.utils import FixedRateLoop
+
 
 def update_preview(robot, frame, pole, status):
     vis = frame.copy()
@@ -32,6 +34,7 @@ def smooth_box(old_box, new_box, alpha):
 
 
 def run(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     close_frames = 0
     missed_frames = 0
     last_pole = None
@@ -42,7 +45,7 @@ def run(robot):
     while robot.state == "approaching_pole":
         frame, pole = robot.detect_pole()
         if frame is None:
-            print("[WARN] No AI camera frame/metadata received")
+            robot.log("[WARN] No AI camera frame/metadata received")
             robot.motors.stop()
             time.sleep(0.1)
             continue
@@ -51,17 +54,17 @@ def run(robot):
             missed_frames += 1
 
             if last_pole is not None and missed_frames <= robot.approach_hold_frame_limit:
-                print(
+                robot.log(
                     f"[APPROACH] Pole briefly lost ({missed_frames}/{robot.approach_hold_frame_limit}); "
                     "holding last drive command"
                 )
                 update_preview(robot, frame, last_pole, f"APPROACH: HOLD {missed_frames}")
                 robot.drive(last_left_speed, last_right_speed)
-                time.sleep(0.05)
+                loop.sleep()
                 continue
 
             close_frames = 0
-            print(f"[APPROACH] Pole lost ({missed_frames}/{robot.approach_missed_frame_limit})")
+            robot.log(f"[APPROACH] Pole lost ({missed_frames}/{robot.approach_missed_frame_limit})")
             update_preview(robot, frame, None, f"APPROACH: LOST {missed_frames}")
 
             if missed_frames >= robot.approach_missed_frame_limit:
@@ -75,7 +78,7 @@ def run(robot):
                 last_left_speed = 0.0
                 last_right_speed = 0.0
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         missed_frames = 0
@@ -95,7 +98,7 @@ def run(robot):
             last_left_speed = 0.0
             last_right_speed = 0.0
             robot.motors.stop()
-            print(
+            robot.log(
                 f"[APPROACH] Close to pole ({close_frames}/{robot.approach_stop_frames_required}), "
                 f"width={width_fraction:.2f}, error_x={error_x:.1f}px"
             )
@@ -105,7 +108,7 @@ def run(robot):
                 robot.pole_reached()
                 return
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         close_frames = 0
@@ -117,9 +120,9 @@ def run(robot):
         last_left_speed = left_speed
         last_right_speed = right_speed
         robot.drive(left_speed, right_speed)
-        print(
+        robot.log(
             f"[APPROACH] width={width_fraction:.2f}, error_x={error_x:.1f}px, "
             f"left={left_speed:.2f}, right={right_speed:.2f}, conf={pole.confidence:.2f}"
         )
         update_preview(robot, frame, pole, f"APPROACH: width={width_fraction:.2f} error={error_x:.1f}")
-        time.sleep(0.05)
+        loop.sleep()

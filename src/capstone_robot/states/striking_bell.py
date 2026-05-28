@@ -2,34 +2,37 @@ import time
 
 import cv2
 
+from capstone_robot.utils import FixedRateLoop
+
 striking_controls = {
     "LensPosition": 12.0,           # Instantly force lens to maximum physical close-up limit
     "ExposureValue": 0.0
 }
 
 def wait_for_bell(robot, required_frames=3):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     seen_frames = 0
 
     while robot.state == "striking_bell":
         ok, frame = robot.pi_camera.read()
         if not ok or frame is None:
-            print("[STRIKE] No camera frame")
-            time.sleep(0.05)
+            robot.log("[STRIKE] No camera frame")
+            loop.sleep()
             continue
 
         bell = robot.bell_tracker.detect(frame)
         if bell is None:
             seen_frames = 0
-            print("[STRIKE] Waiting for bell")
+            robot.log("[STRIKE] Waiting for bell")
             update_preview(robot, frame, None, "STRIKE: WAITING FOR BELL")
         else:
             seen_frames += 1
-            print(f"[STRIKE] Bell detected ({seen_frames}/{required_frames})")
+            robot.log(f"[STRIKE] Bell detected ({seen_frames}/{required_frames})")
             update_preview(robot, frame, bell, f"STRIKE: BELL {seen_frames}/{required_frames}")
             if seen_frames >= required_frames:
                 return True
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 

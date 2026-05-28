@@ -54,7 +54,6 @@ def choose_pole(detections, frame, target_label="pole"):
                 if pole_center_x >= 0.3 * frame_width:
                     if pole_center_x <= 0.7 * frame_width:
                         poles.append(det)
-                        print(f"DET CENTER: {pole_center_x}")
         if poles:
             return max(poles, key=lambda det: det.confidence)
         else:
@@ -103,6 +102,11 @@ class CapstoneRobot(object):
         self.preview_server.start()
         print("Preview stream: http://<RPI_IP_ADDRESS>:1234")
 
+        self.verbose = False
+
+        ### CONTROL LOOP
+        self.control_loop_period_seconds = 0.05  # 20 Hz control/update target
+
         ### SEARCHING POLE
         self.search_startup_wait_seconds = 1.0
         self.pole_conf_threshold = 0.7
@@ -110,25 +114,33 @@ class CapstoneRobot(object):
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 0.8
-        self.search_turn_speed = 0.4
-        self.center_turn_speed = 0.4
+        self.search_turn_speed = 0.3
+        self.center_turn_speed = 0.3  # max centering turn speed
+        self.center_turn_min_speed = 0.25
+        self.center_turn_gain = 0.6
+        self.center_turn_derivative_gain = 0.03
+        self.pole_search_initial_direction = "right"
+        self.pole_search_sweep_frames = 12
+        self.pole_recenter_search_sweep_frames = 60
 
         ### APPROACHING POLE
         self.approach_hold_frame_limit = 3
         # self.pole_smooth_alpha = 0.75
-        self.approach_speed = 0.4
+        self.approach_speed = 0.3
         self.approach_steer_gain = 0.5
         self.approach_stop_width_fraction = 0.2
         self.approach_stop_frames_required = 3
         self.approach_missed_frame_limit = 10
 
         ### ALIGNING POLE/BELL
+        self.align_min_pole_width_fraction = 0.06
         self.align_turn_speed = 0.5
         # self.align_quarter_turn_seconds = 1
         # self.orbit_speed = 0.5
-        self.alignment_error_threshold_px = 30
+        self.alignment_error_threshold_px = 30 ### increased from 20 to 30
         self.alignment_stable_frames_required = 4
         self.alignment_missed_frame_limit = 15
+        self.pole_bell_error_smooth_alpha = 0.45
 
         self.pole_bell_error_threshold_px = 20
         self.pole_bell_max_orbit_steps = 20
@@ -147,9 +159,12 @@ class CapstoneRobot(object):
 
         ### CLIMBING POLE
         self.climb_center_timeout_seconds = 2.0
-        self.start_climb_settle_seconds = 1.0 ## settle after attach, before climb
+        self.climb_backoff_speed = 0.2
+        self.climb_backoff_seconds = 0.4
+        self.climb_backoff_settle_seconds = 0.2
+        self.start_climb_settle_seconds = 0.5 ## settle after attach, before climb
         self.climb_attach_speed = 0.5
-        self.climb_attach_seconds = 2.0
+        self.climb_attach_seconds = 1.0
         self.climb_speed = 0.6
         self.climb_full_speed = 1.0
         self.climb_bell_stable_frames_required = 3
@@ -157,7 +172,9 @@ class CapstoneRobot(object):
         self.climb_hold_speed = 0.3
         self.climb_circle_lost_after_frames = 8
         self.climb_passive_min_hit_interval_seconds = 3.0
-        self.climb_loop_sleep_seconds = 0.05
+        self.climb_ramp_start_speed = 0.4
+        self.climb_ramp_seconds = 0.75
+        self.climb_ramp_steps = 8
         
         # Initialize Finite State Machine
         self.machine = Machine(model=self, states=CapstoneRobot.states, initial='searching_pole')
@@ -186,6 +203,30 @@ class CapstoneRobot(object):
         left_speed = max(-1.0, min(1.0, left_speed))
         right_speed = max(-1.0, min(1.0, right_speed))
         self.motors.value = (left_speed, right_speed)
+
+    def log(self, message):
+        if self.verbose:
+            print(message)
+
+    def center_turn_speed_for_error(self, error_x, frame_width, previous_error_x=None, dt=None):
+        if frame_width <= 0:
+            return self.center_turn_speed
+
+        half_width = frame_width / 2.0
+        normalized_error = abs(error_x) / half_width
+        max_speed = self.center_turn_speed
+        min_speed = min(self.center_turn_min_speed, max_speed)
+        speed = normalized_error * self.center_turn_gain
+
+        if previous_error_x is not None and dt is not None and dt > 0:
+            signed_error = error_x / half_width
+            previous_signed_error = previous_error_x / half_width
+            error_rate = (signed_error - previous_signed_error) / dt
+
+            if signed_error * error_rate < 0:
+                speed -= abs(error_rate) * self.center_turn_derivative_gain
+
+        return max(min_speed, min(max_speed, speed))
 
     def turn_in_place(self, direction, seconds, speed=None):
         speed = self.align_turn_speed if speed is None else speed

@@ -284,6 +284,7 @@ class PoleBellTracker2:
         max_angle_from_vertical_deg=35,
         angle_group_deg=12,
         smooth_alpha=0.65,
+        error_smooth_alpha=0.45,
         base_short_side=480.0,
     ):
         self.color_format = color_format
@@ -291,11 +292,14 @@ class PoleBellTracker2:
         self.max_angle_from_vertical_deg = max_angle_from_vertical_deg
         self.angle_group_deg = angle_group_deg
         self.smooth_alpha = smooth_alpha
+        self.error_smooth_alpha = error_smooth_alpha
         self.base_short_side = base_short_side
         self.previous_line = None
+        self.previous_error = None
 
     def reset(self):
         self.previous_line = None
+        self.previous_error = None
 
     def detect(self, frame):
         return detect_pole_bell_alignment(frame, tracker=self, color_format=self.color_format)
@@ -395,6 +399,15 @@ def detect_pole_bell_alignment(frame, tracker=None, color_format="rgb"):
 
     bx, by, _ = bell
     error = horizontal_error_to_line(bx, by, pole_line)
+
+    if hasattr(tracker, "previous_error"):
+        alpha = getattr(tracker, "error_smooth_alpha", 1.0)
+        if tracker.previous_error is None or alpha >= 1.0:
+            tracker.previous_error = error
+        else:
+            tracker.previous_error = alpha * error + (1.0 - alpha) * tracker.previous_error
+        error = tracker.previous_error
+
     side = "right" if error > 0 else "left"
     return PoleBellAlignment(error_px=error, side=side, pole_line=pole_line, bell=bell)
 

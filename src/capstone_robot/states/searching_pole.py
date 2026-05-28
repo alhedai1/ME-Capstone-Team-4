@@ -2,6 +2,8 @@ import time
 
 import cv2
 
+from capstone_robot.utils import FixedRateLoop
+
 
 def update_preview(robot, frame, pole, status):
     vis = frame.copy()
@@ -24,19 +26,45 @@ def smooth_box(old_box, new_box, alpha):
     )
 
 
+def opposite_direction(direction):
+    return "left" if direction == "right" else "right"
+
+
+def alternating_search_direction(missed_frames, initial_direction, sweep_frames):
+    direction = initial_direction if initial_direction in ("left", "right") else "right"
+    sweep_frames = max(1, int(sweep_frames))
+    remaining = max(0, missed_frames - 1)
+    segment = 0
+
+    while True:
+        segment_length = (segment + 1) * sweep_frames
+        if remaining < segment_length:
+            break
+        remaining -= segment_length
+        segment += 1
+
+    if segment % 2 == 1:
+        direction = opposite_direction(direction)
+
+    return direction, segment + 1
+
+
 def run(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     stable_frames = 0
     missed_frames = 0
     last_pole = None
     smoothed_box = None
     last_motor_action = None
+    last_center_error_x = None
+    last_center_time = None
 
     search_started_at = time.time()
 
     while robot.state == "searching_pole":
         frame, pole = robot.detect_pole()
         if frame is None:
-            print("[WARN] No AI camera frame/metadata received")
+            robot.log("[WARN] No AI camera frame/metadata received")
             robot.motors.stop()
             time.sleep(0.1)
             continue
@@ -44,15 +72,15 @@ def run(robot):
         if pole is None:
             if time.time() - search_started_at < robot.search_startup_wait_seconds:
                 robot.motors.stop()
-                print(f"[SEARCH] Waiting for initial pole detection - Time: {time.time() -search_started_at}")
+                robot.log(f"[SEARCH] Waiting for initial pole detection - Time: {time.time() -search_started_at}")
                 update_preview(robot, frame, None, "SEARCH: STARTUP WAIT")
-                time.sleep(0.05)
+                loop.sleep()
                 continue
 
             missed_frames += 1
 
             if last_pole is not None and missed_frames <= robot.search_missed_frame_limit:
-                print(
+                robot.log(
                     f"[SEARCH] Pole briefly lost ({missed_frames}/{robot.search_missed_frame_limit}); "
                     "holding position"
                 )
@@ -64,16 +92,29 @@ def run(robot):
                     robot.motors.right(robot.center_turn_speed)
                 else:
                     robot.motors.stop()
-                time.sleep(0.05)
+                loop.sleep()
                 continue
 
             stable_frames = 0
             last_pole = None
             smoothed_box = None
-            print("[SEARCH] Pole not detected; rotating slowly")
-            update_preview(robot, frame, None, "SEARCH: NO POLE")
-            robot.motors.right(robot.search_turn_speed)
-            time.sleep(0.05)
+            last_center_error_x = None
+            last_center_time = None
+            search_direction, sweep = alternating_search_direction(
+                missed_frames,
+                getattr(robot, "pole_search_initial_direction", "right"),
+                getattr(robot, "pole_search_sweep_frames", 12),
+            )
+            robot.log(
+                f"[SEARCH] Pole not detected; sweep {sweep}, "
+                f"rotating {search_direction} slowly"
+            )
+            update_preview(robot, frame, None, f"SEARCH: NO POLE {search_direction.upper()}")
+            if search_direction == "left":
+                robot.motors.left(robot.search_turn_speed)
+            else:
+                robot.motors.right(robot.search_turn_speed)
+            loop.sleep()
             continue
 
         missed_frames = 0
@@ -89,8 +130,10 @@ def run(robot):
         if abs(error_x) <= robot.pole_center_deadband_px:
             stable_frames += 1
             last_motor_action = "stop"
+            last_center_error_x = None
+            last_center_time = None
             robot.motors.stop()
-            print(
+            robot.log(
                 f"[SEARCH] Pole centered ({stable_frames}/{robot.pole_stable_frames_required}), "
                 f"error_x={error_x:.1f}px, conf={pole.confidence:.2f}"
             )
@@ -101,15 +144,21 @@ def run(robot):
                 return
         else:
             stable_frames = 0
+            now = time.monotonic()
+            dt = None if last_center_time is None else now - last_center_time
+            turn_speed = robot.center_turn_speed_for_error(error_x, frame.shape[1], last_center_error_x, dt)
+            last_center_error_x = error_x
+            last_center_time = now
+
             if error_x < 0:
-                print(f"[SEARCH] Pole left of center, error_x={error_x:.1f}px")
+                robot.log(f"[SEARCH] Pole left of center, error_x={error_x:.1f}px, turn={turn_speed:.2f}")
                 update_preview(robot, frame, pole, f"SEARCH: LEFT error={error_x:.1f}")
                 last_motor_action = "left"
-                robot.motors.left(robot.center_turn_speed)
+                robot.motors.left(turn_speed)
             else:
-                print(f"[SEARCH] Pole right of center, error_x={error_x:.1f}px")
+                robot.log(f"[SEARCH] Pole right of center, error_x={error_x:.1f}px, turn={turn_speed:.2f}")
                 update_preview(robot, frame, pole, f"SEARCH: RIGHT error={error_x:.1f}")
                 last_motor_action = "right"
-                robot.motors.right(robot.center_turn_speed)
+                robot.motors.right(turn_speed)
 
-        time.sleep(0.05)
+        loop.sleep()

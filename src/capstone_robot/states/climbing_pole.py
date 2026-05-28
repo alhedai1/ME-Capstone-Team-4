@@ -2,6 +2,8 @@ import time
 
 import cv2
 
+from capstone_robot.utils import FixedRateLoop
+
 
 striking_controls = {
     "LensPosition": 12.0,           # Instantly force lens to maximum physical close-up limit
@@ -43,6 +45,7 @@ def smooth_box(old_box, new_box, alpha):
 
 
 def approach_front_pole(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     close_frames = 0
     missed_frames = 0
     smoothed_box = None
@@ -69,7 +72,7 @@ def approach_front_pole(robot):
             else:
                 robot.motors.right(setting(robot, "search_turn_speed", 0.3))
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         missed_frames = 0
@@ -94,7 +97,7 @@ def approach_front_pole(robot):
             if close_frames >= setting(robot, "approach_stop_frames_required", 3):
                 return True
 
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         close_frames = 0
@@ -112,12 +115,13 @@ def approach_front_pole(robot):
             f"error_x={error_x:.1f}px, left={left_speed:.2f}, right={right_speed:.2f}"
         )
         update_front_preview(robot, frame, pole, f"REAPPROACH: width={width_fraction:.2f}")
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 
 
 def center_front_pole(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     stable_frames = 0
     last_pole = None
     missed_frames = 0
@@ -154,7 +158,7 @@ def center_front_pole(robot):
                 else:
                     robot.motors.stop()
 
-                time.sleep(0.05)
+                loop.sleep()
                 continue
 
             stable_frames = 0
@@ -163,7 +167,7 @@ def center_front_pole(robot):
             robot.motors.stop()
             print("[CLIMB] Front pole not detected while centering")
             update_front_preview(robot, frame, None, "CLIMB: NO FRONT POLE")
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         x, y, w, h = pole.box
@@ -196,7 +200,7 @@ def center_front_pole(robot):
                 print(f"[CLIMB] Front pole right of center, error_x={error_x:.1f}px")
                 update_front_preview(robot, frame, pole, f"CLIMB: RIGHT {error_x:.1f}")
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 
@@ -213,6 +217,7 @@ def attach_to_pole(robot):
 
 
 def climb_until_bell(robot):
+    loop = FixedRateLoop(period_seconds=getattr(robot, "control_loop_period_seconds", 0.05))
     seen_frames = 0
     started_at = time.time()
 
@@ -228,7 +233,7 @@ def climb_until_bell(robot):
             seen_frames = 0
             robot.motors.forward(robot.climb_speed)
             print("[CLIMB] No Pi camera frame; continuing climb")
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         bell = robot.bell_tracker.detect(frame)
@@ -237,7 +242,7 @@ def climb_until_bell(robot):
             robot.motors.forward(robot.climb_speed)
             print("[CLIMB] Climbing; bell not detected")
             update_bell_preview(robot, frame, None, "CLIMB: NO BELL")
-            time.sleep(0.05)
+            loop.sleep()
             continue
 
         seen_frames += 1
@@ -251,7 +256,7 @@ def climb_until_bell(robot):
             robot.motors.forward(robot.climb_hold_speed)
             return True
 
-        time.sleep(0.05)
+        loop.sleep()
 
     return False
 

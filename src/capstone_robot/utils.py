@@ -10,6 +10,27 @@ import time
 from dataclasses import dataclass
 
 
+class FixedRateLoop:
+    def __init__(self, hz=None, period_seconds=None):
+        if period_seconds is None:
+            if hz is None or hz <= 0:
+                raise ValueError("FixedRateLoop requires a positive hz or period_seconds")
+            period_seconds = 1.0 / hz
+
+        self.period_seconds = float(period_seconds)
+        self.next_time = time.monotonic() + self.period_seconds
+
+    def sleep(self):
+        now = time.monotonic()
+        remaining = self.next_time - now
+
+        if remaining > 0:
+            time.sleep(remaining)
+            self.next_time += self.period_seconds
+            return
+
+        self.next_time = now + self.period_seconds
+
 
 def find_repo_root(start_path):
     """
