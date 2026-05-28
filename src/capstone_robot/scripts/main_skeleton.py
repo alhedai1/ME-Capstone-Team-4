@@ -159,11 +159,12 @@ class CapstoneRobot(object):
 
         ### CLIMBING POLE
         self.climb_center_timeout_seconds = 2.0
-        self.climb_backoff_speed = 0.0
-        self.climb_backoff_seconds = 0.5
+        # GO BACK HOW FAR????
+        self.climb_backoff_speed = 0.2
+        self.climb_backoff_seconds = 0.4
         self.climb_backoff_settle_seconds = 0.2
         self.start_climb_settle_seconds = 0.1 ## settle after attach, before climb
-        self.climb_attach_speed = 0.7
+        self.climb_attach_speed = 0.6
         self.climb_attach_seconds = 1.0
         self.climb_speed = 0.6
         self.climb_full_speed = 1.0
@@ -171,10 +172,16 @@ class CapstoneRobot(object):
         self.climb_max_seconds = 50.0
         self.climb_hold_speed = 0.3
         self.climb_circle_lost_after_frames = 10
-        self.climb_passive_min_hit_interval_seconds = 6.0
+        self.climb_passive_min_hit_interval_seconds = 3.0
         self.climb_ramp_start_speed = 0.4
         self.climb_ramp_seconds = 0.75
         self.climb_ramp_steps = 8
+
+        self.climb_attach_retry_attempts = 5
+        self.climb_failure_check_delay_seconds = 1.5
+        self.climb_failure_check_seconds = 1.5
+        self.climb_failure_bell_confirm_frames = 5
+        self.climb_failure_circle_lost_after_frames = 1
         
         # Initialize Finite State Machine
         self.machine = Machine(model=self, states=CapstoneRobot.states, initial='searching_pole')

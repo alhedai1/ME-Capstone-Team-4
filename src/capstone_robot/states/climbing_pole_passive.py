@@ -17,6 +17,12 @@ def read_ai_frame(robot):
         return None
     return frame
 
+def read_pi_frame(robot):
+    ok, frame, _metadata = robot.pi_camera.read()
+    if not ok or frame is None:
+        return None
+    return frame
+
 
 def get_bell_circle_detector(robot):
     detector = getattr(robot, "climb_bell_circle", None)
@@ -38,6 +44,21 @@ def get_bell_circle_detector(robot):
         robot.climb_bell_circle = detector
     return detector
 
+def make_pi_failure_bell_detector(robot):
+    return BellCircle(
+        color_format="rgb",
+        dp=setting(robot, "climb_failure_circle_dp", 1.5),
+        min_dist=setting(robot, "climb_failure_circle_min_dist", 5),
+        param1=setting(robot, "climb_failure_circle_param1", 50),
+        param2=setting(robot, "climb_failure_circle_param2", 50),
+        min_radius=setting(robot, "climb_failure_circle_min_radius", 10),
+        max_radius=setting(robot, "climb_failure_circle_max_radius", 50),
+        startup_max_radius=setting(robot, "climb_failure_circle_startup_max_radius", 50),
+        tracking_max_radius=setting(robot, "climb_failure_circle_tracking_max_radius", 130),
+        lost_after_frames=setting(robot, "climb_failure_circle_lost_after_frames", 1),
+        startup_confirm_threshold=setting(robot, "climb_failure_bell_confirm_frames", 5),
+        show_debug=setting(robot, "climb_failure_circle_show_debug", False),
+    )
 
 def update_preview(robot, frame, detection, status):
     if frame is None:
@@ -99,6 +120,56 @@ def attach_to_pole(robot):
     robot.motors.stop()
     time.sleep(robot.start_climb_settle_seconds)
 
+def pi_camera_still_sees_bell_after_climb_attempt(robot, climb_speed):
+    delay_seconds = setting(robot, "climb_failure_check_delay_seconds", 1.5)
+    check_seconds = setting(robot, "climb_failure_check_seconds", 1.5)
+    confirm_frames = setting(robot, "climb_failure_bell_confirm_frames", 5)
+
+    detector = make_pi_failure_bell_detector(robot)
+    loop = FixedRateLoop(period_seconds=setting(robot, "control_loop_period_seconds", 0.05))
+
+    started_at = time.time()
+    seen_frames = 0
+
+    while robot.state == "climbing_pole":
+        elapsed = time.time() - started_at
+        if elapsed >= delay_seconds + check_seconds:
+            return False
+
+        robot.motors.forward(climb_speed)
+
+        frame = read_pi_frame(robot)
+        if frame is None:
+            seen_frames = 0
+            robot.log("[CLIMB-PASSIVE] No Pi camera frame during climb failure check")
+            loop.sleep()
+            continue
+
+        if elapsed < delay_seconds:
+            update_preview(robot, frame, None, "CLIMB CHECK: delay")
+            loop.sleep()
+            continue
+
+        detection = detector.detect(frame)
+
+        # Count only fresh detections, not held last_circle frames.
+        if detection is not None and detector.missed_frames == 0:
+            seen_frames += 1
+            status = f"CLIMB FAIL CHECK: PI BELL {seen_frames}/{confirm_frames}"
+        else:
+            seen_frames = 0
+            status = "CLIMB FAIL CHECK: no pi bell"
+
+        update_preview(robot, frame, detection, status)
+
+        if seen_frames >= confirm_frames:
+            robot.log("[CLIMB-PASSIVE] Pi camera still sees bell after climb attempt; retrying climb.")
+            robot.motors.stop()
+            return True
+
+        loop.sleep()
+
+    return False
 
 def run(robot):
     print("[STATE] Passive climbing pole loop...")
@@ -112,15 +183,44 @@ def run(robot):
     bell_reacquired_at = None
 
     try:
-        back_off_from_pole(robot)
-        if not center_front_pole(robot):
-            robot.log("[CLIMB-PASSIVE] Centering timed out; attaching anyway")
-        attach_to_pole(robot)
-        ramp_climb_speed(robot, climb_speed)
-        print(
-            f"[CLIMB-PASSIVE] Looping: full-speed climb while circle is visible, "
-            f"0-speed slip down while circle is gone. speed={climb_speed:.2f}"
-        )
+        # back_off_from_pole(robot)
+        # if not center_front_pole(robot):
+        #     robot.log("[CLIMB-PASSIVE] Centering timed out; attaching anyway")
+        # attach_to_pole(robot)
+        # ramp_climb_speed(robot, climb_speed)
+        # print(
+        #     f"[CLIMB-PASSIVE] Looping: full-speed climb while circle is visible, "
+        #     f"0-speed slip down while circle is gone. speed={climb_speed:.2f}"
+        # )
+        max_attempts = setting(robot, "climb_attach_retry_attempts", 2)
+        attempt = 0
+
+        while robot.state == "climbing_pole":
+            attempt += 1
+            robot.log(f"[CLIMB-PASSIVE] Climb attach attempt {attempt}/{max_attempts + 1}")
+
+            back_off_from_pole(robot)
+            if not center_front_pole(robot):
+                robot.log("[CLIMB-PASSIVE] Centering timed out; attaching anyway")
+
+            if attempt >= 4:
+                back_off_from_pole(robot)
+                robot.motors.left(0.3)
+                time.sleep(0.1)
+                robot.motors.forward(0.2)
+                time.sleep(0.1)
+
+            attach_to_pole(robot)
+            ramp_climb_speed(robot, climb_speed)
+
+            failed_attempt = pi_camera_still_sees_bell_after_climb_attempt(robot, climb_speed)
+            if not failed_attempt:
+                break
+
+            
+            if attempt > max_attempts:
+                robot.log("[CLIMB-PASSIVE] Climb retry limit reached; continuing passive climb loop anyway.")
+                break
 
         while robot.state == "climbing_pole":
             frame = read_ai_frame(robot)
