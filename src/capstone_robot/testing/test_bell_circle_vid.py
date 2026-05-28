@@ -8,7 +8,7 @@ from capstone_robot.vision.bell_circle_climb import BellCircle
 
 REPO_ROOT = find_repo_root(__file__)
 DEFAULT_VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_align_trim.mp4"
-DEFAULT_VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may27/bell_strike_controls.mp4"
+DEFAULT_VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may27/ai_bell_upwards3.mp4"
 
 def draw_detection(img, detection):
     vis = img.copy()

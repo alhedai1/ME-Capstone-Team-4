@@ -126,7 +126,7 @@ class CapstoneRobot(object):
         self.align_turn_speed = 0.5
         # self.align_quarter_turn_seconds = 1
         # self.orbit_speed = 0.5
-        self.alignment_error_threshold_px = 20
+        self.alignment_error_threshold_px = 30
         self.alignment_stable_frames_required = 4
         self.alignment_missed_frame_limit = 15
 

@@ -125,7 +125,7 @@ class BellCircle:
         
         for c in circles:
             x, y, r = c
-            if x < 0.1*frame.shape[1] or x > 0.9*frame.shape[1]:
+            if x < 0.2*frame.shape[1] or x > 0.8*frame.shape[1]:
                 continue
             # on startup, consider all circles
             if self.last_circle is None:

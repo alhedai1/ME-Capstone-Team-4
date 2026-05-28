@@ -278,7 +278,15 @@ def wait_for_pole_bell_alignment(robot):
                 f"({missed_frames}/{setting(robot, 'alignment_missed_frame_limit', 15)})"
             )
             update_alignment_preview(robot, frame, None, f"ALIGN: LOST {missed_frames}")
-            time.sleep(5)
+            if missed_frames >= setting(robot, "alignment_missed_frame_limit", 15):
+                print("[ALIGN-CIRCLE] Pole+bell alignment lost too long; recentering front pole")
+                get_pole_bell_tracker(robot).reset()
+                if not center_front_pole(robot, label="ALIGN RECOVER"):
+                    return None, None
+                get_pole_bell_tracker(robot).reset()
+                missed_frames = 0
+
+            time.sleep(0.05)
             continue
 
         missed_frames = 0
