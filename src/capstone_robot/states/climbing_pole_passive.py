@@ -29,7 +29,7 @@ def get_bell_circle_detector(robot):
             param2=setting(robot, "climb_circle_param2", 50),
             min_radius=setting(robot, "climb_circle_min_radius", 10),
             max_radius=setting(robot, "climb_circle_max_radius", 50),
-            startup_max_radius=setting(robot, "climb_circle_startup_max_radius", 50),
+            startup_max_radius=setting(robot, "climb_circle_startup_max_radius", 30),
             tracking_max_radius=setting(robot, "climb_circle_tracking_max_radius", 130),
             lost_after_frames=setting(robot, "climb_circle_lost_after_frames", 8),
             startup_confirm_threshold=setting(robot, "climb_circle_startup_confirm_frames", 2),
@@ -138,7 +138,7 @@ def run(robot):
 
             if phase == "climb":
                 if detection is None:
-                    time.sleep(2)
+                    time.sleep(1)
                     hit_count += 1
                     bell_reacquired_at = None
                     phase = "descend"

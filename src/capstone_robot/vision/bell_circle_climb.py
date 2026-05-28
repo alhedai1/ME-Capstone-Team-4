@@ -82,7 +82,8 @@ class BellCircle:
             max_radius = self.startup_max_radius
         else:
             # lost after already seeing the bell: do NOT go back to tiny startup search
-            min_radius = max(self.min_radius, int(self.last_known_radius * 0.8))
+            # min_radius = max(self.min_radius, int(self.last_known_radius * 0.8))
+            min_radius = self.min_radius
             max_radius = self.tracking_max_radius
         
         ### get circles

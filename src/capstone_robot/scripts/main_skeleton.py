@@ -113,9 +113,9 @@ class CapstoneRobot(object):
         self.pole_center_deadband_px = 20
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
-        self.pole_smooth_alpha = 0.8
-        self.search_turn_speed = 0.3
-        self.center_turn_speed = 0.3  # max centering turn speed
+        self.pole_smooth_alpha = 0.5
+        self.search_turn_speed = 0.25
+        self.center_turn_speed = 0.25  # max centering turn speed
         self.center_turn_min_speed = 0.25
         self.center_turn_gain = 0.6
         self.center_turn_derivative_gain = 0.03
@@ -168,9 +168,9 @@ class CapstoneRobot(object):
         self.climb_speed = 0.6
         self.climb_full_speed = 1.0
         self.climb_bell_stable_frames_required = 3
-        self.climb_max_seconds = 20.0
+        self.climb_max_seconds = 50.0
         self.climb_hold_speed = 0.3
-        self.climb_circle_lost_after_frames = 8
+        self.climb_circle_lost_after_frames = 10
         self.climb_passive_min_hit_interval_seconds = 3.0
         self.climb_ramp_start_speed = 0.4
         self.climb_ramp_seconds = 0.75
