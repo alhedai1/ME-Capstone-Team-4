@@ -2,23 +2,11 @@ import time
 
 import cv2
 
-from capstone_robot.vision.bell_circle_climb import BellCircle
 
 striking_controls = {
     "LensPosition": 12.0,           # Instantly force lens to maximum physical close-up limit
     "ExposureValue": 0.0
 }
-
-
-def setting(robot, name, default):
-    return getattr(robot, name, default)
-
-
-def smooth_box(old_box, new_box, alpha):
-    if old_box is None:
-        return new_box
-
-    return tuple(int(alpha * new + (1.0 - alpha) * old) for old, new in zip(old_box, new_box))
 
 
 def update_front_preview(robot, frame, pole, status):
@@ -43,54 +31,15 @@ def update_bell_preview(robot, frame, bell, status):
     robot.update_preview(vis)
 
 
-def update_circle_preview(robot, frame, detection, status):
-    if frame is None:
-        return
-
-    vis = frame.copy()
-    height, width = vis.shape[:2]
-    cv2.line(vis, (width // 2, 0), (width // 2, height), (80, 80, 80), 1)
-
-    if detection is not None:
-        x, y, radius = detection.circle
-        cv2.circle(vis, (x, y), radius, (255, 0, 0), 2)
-        cv2.circle(vis, (x, y), 3, (0, 255, 0), -1)
-
-    cv2.putText(vis, status, (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-    robot.update_preview(vis)
+def setting(robot, name, default):
+    return getattr(robot, name, default)
 
 
-def get_climb_bell_circle(robot):
-    detector = getattr(robot, "climb_bell_circle", None)
-    if detector is None:
-        detector = BellCircle(
-            color_format="rgb",
-            dp=setting(robot, "climb_circle_dp", 1.5),
-            min_dist=setting(robot, "climb_circle_min_dist", 5),
-            param1=setting(robot, "climb_circle_param1", 50),
-            param2=setting(robot, "climb_circle_param2", 50),
-            min_radius=setting(robot, "climb_circle_min_radius", 10),
-            max_radius=setting(robot, "climb_circle_max_radius", 50),
-            startup_max_radius=setting(robot, "climb_circle_startup_max_radius", 50),
-            tracking_max_radius=setting(robot, "climb_circle_tracking_max_radius", 130),
-            lost_after_frames=setting(robot, "climb_circle_lost_after_frames", 8),
-            startup_confirm_threshold=setting(robot, "climb_circle_startup_confirm_frames", 2),
-            show_debug=setting(robot, "climb_circle_show_debug", False),
-        )
-        robot.climb_bell_circle = detector
-    return detector
+def smooth_box(old_box, new_box, alpha):
+    if old_box is None:
+        return new_box
 
-
-def reset_climb_bell_circle(robot):
-    robot.climb_bell_circle = None
-    return get_climb_bell_circle(robot)
-
-
-def read_ai_frame(robot):
-    ok, frame, _metadata = robot.ai_camera.read()
-    if not ok or frame is None:
-        return None
-    return frame
+    return tuple(int(alpha * new + (1.0 - alpha) * old) for old, new in zip(old_box, new_box))
 
 
 def approach_front_pole(robot):
@@ -167,6 +116,7 @@ def approach_front_pole(robot):
 
     return False
 
+
 def center_front_pole(robot):
     stable_frames = 0
     last_pole = None
@@ -215,7 +165,7 @@ def center_front_pole(robot):
             update_front_preview(robot, frame, None, "CLIMB: NO FRONT POLE")
             time.sleep(0.05)
             continue
-        
+
         x, y, w, h = pole.box
         error_x = (x + w / 2.0) - (frame.shape[1] / 2.0)
         missed_frames = 0
@@ -306,186 +256,21 @@ def climb_until_bell(robot):
     return False
 
 
-def drive_climb_tracking_bell(robot, detection, frame_width, speed=None):
-    speed = setting(robot, "climb_fast_speed", setting(robot, "climb_speed", 0.6)) if speed is None else speed
-    error_x = detection.x - frame_width / 2.0
-    normalized_error = error_x / max(1.0, frame_width / 2.0)
-    steer = max(
-        -setting(robot, "climb_circle_max_steer", 0.25),
-        min(
-            setting(robot, "climb_circle_max_steer", 0.25),
-            normalized_error * setting(robot, "climb_circle_steer_gain", 0.35),
-        ),
-    )
-    robot.drive(speed + steer, speed - steer)
-    return error_x, steer
-
-
-def wait_for_circle_lock(robot, detector):
-    started_at = time.time()
-    stable_frames = 0
-
-    while robot.state == "climbing_pole":
-        if time.time() - started_at >= setting(robot, "climb_circle_lock_timeout_seconds", 5.0):
-            print("[CLIMB-PASSIVE] Bell circle lock timed out")
-            return False
-
-        frame = read_ai_frame(robot)
-        if frame is None:
-            robot.motors.stop()
-            print("[CLIMB-PASSIVE] No AI camera frame while locking bell circle")
-            time.sleep(0.05)
-            continue
-
-        detection = detector.detect(frame)
-        if detection is None:
-            stable_frames = 0
-            robot.motors.stop()
-            update_circle_preview(robot, frame, None, "CLIMB: FIND CIRCLE")
-            time.sleep(0.05)
-            continue
-
-        error_x = detection.x - frame.shape[1] / 2.0
-        if abs(error_x) <= setting(robot, "climb_circle_center_deadband_px", 45):
-            stable_frames += 1
-            robot.motors.stop()
-        elif error_x < 0:
-            stable_frames = 0
-            robot.motors.left(setting(robot, "climb_circle_search_turn_speed", 0.25))
-        else:
-            stable_frames = 0
-            robot.motors.right(setting(robot, "climb_circle_search_turn_speed", 0.25))
-
-        print(
-            f"[CLIMB-PASSIVE] Bell circle lock "
-            f"({stable_frames}/{setting(robot, 'climb_circle_lock_frames_required', 3)}), "
-            f"error_x={error_x:.1f}px, radius={detection.radius}"
-        )
-        update_circle_preview(robot, frame, detection, f"CLIMB: LOCK {stable_frames}")
-
-        if stable_frames >= setting(robot, "climb_circle_lock_frames_required", 3):
-            return True
-
-        time.sleep(0.05)
-
-    return False
-
-
-def climb_to_passive_hit(robot, detector):
-    started_at = time.time()
-    seen_once = False
-
-    while robot.state == "climbing_pole":
-        if time.time() - started_at >= setting(robot, "climb_max_seconds", 20.0):
-            robot.motors.stop()
-            print("[CLIMB-PASSIVE] Timed out before passive bell hit")
-            return False
-
-        frame = read_ai_frame(robot)
-        if frame is None:
-            robot.motors.forward(setting(robot, "climb_fast_speed", setting(robot, "climb_speed", 0.6)))
-            print("[CLIMB-PASSIVE] No AI camera frame; climbing straight")
-            time.sleep(0.05)
-            continue
-
-        detection = detector.detect(frame)
-        if detection is None:
-            robot.motors.forward(setting(robot, "climb_fast_speed", setting(robot, "climb_speed", 0.6)))
-            update_circle_preview(robot, frame, None, "CLIMB: LOST")
-
-            if seen_once:
-                print("[CLIMB-PASSIVE] Bell circle left frame; assuming passive hit")
-                return True
-
-            print("[CLIMB-PASSIVE] Climbing; bell circle not locked yet")
-            time.sleep(0.05)
-            continue
-
-        seen_once = True
-        error_x, steer = drive_climb_tracking_bell(robot, detection, frame.shape[1])
-        update_circle_preview(robot, frame, detection, f"CLIMB: err={error_x:.0f} r={detection.radius}")
-        print(
-            f"[CLIMB-PASSIVE] Tracking bell circle while climbing, "
-            f"error_x={error_x:.1f}px, radius={detection.radius}, steer={steer:.2f}"
-        )
-
-        if detection.radius >= setting(robot, "climb_circle_hit_radius_px", 115):
-            print("[CLIMB-PASSIVE] Bell circle is very close; assuming passive hit")
-            return True
-
-        time.sleep(0.05)
-
-    return False
-
-
-def descend_and_reacquire(robot):
-    descend_seconds = setting(robot, "climb_passive_descend_seconds", 0.8)
-    descend_speed = setting(robot, "climb_passive_descend_speed", 0.25)
-    hold_seconds = setting(robot, "climb_passive_hold_seconds", 1.0)
-
-    print(
-        f"[CLIMB-PASSIVE] Descending after hit: "
-        f"speed={descend_speed:.2f}, time={descend_seconds:.2f}s"
-    )
-    robot.motors.backward(descend_speed)
-    time.sleep(descend_seconds)
-    robot.motors.forward(setting(robot, "climb_hold_speed", 0.3))
-    time.sleep(hold_seconds)
-
-    detector = reset_climb_bell_circle(robot)
-    wait_for_circle_lock(robot, detector)
-
-
-def passive_climb_strike(robot):
-    detector = reset_climb_bell_circle(robot)
-    cycles = setting(robot, "climb_passive_hit_cycles", 2)
-    min_interval_seconds = setting(robot, "climb_passive_min_hit_interval_seconds", 3.0)
-    hit_count = 0
-    last_hit_at = None
-
-    if not wait_for_circle_lock(robot, detector):
-        return False
-
-    while robot.state == "climbing_pole" and (cycles <= 0 or hit_count < cycles):
-        if last_hit_at is not None:
-            remaining = min_interval_seconds - (time.time() - last_hit_at)
-            if remaining > 0:
-                robot.motors.forward(setting(robot, "climb_hold_speed", 0.3))
-                print(f"[CLIMB-PASSIVE] Waiting {remaining:.2f}s before next hit attempt")
-                time.sleep(remaining)
-
-        if not climb_to_passive_hit(robot, detector):
-            return False
-
-        hit_count += 1
-        last_hit_at = time.time()
-        print(f"[CLIMB-PASSIVE] Passive hit {hit_count}/{cycles if cycles > 0 else 'inf'}")
-
-        if cycles > 0 and hit_count >= cycles:
-            robot.motors.forward(setting(robot, "climb_hold_speed", 0.3))
-            return True
-
-        descend_and_reacquire(robot)
-        detector = get_climb_bell_circle(robot)
-
-    return True
-
-
 def run(robot):
     print("[STATE] Climbing pole...")
+    robot.pi_camera.picam2.set_controls(striking_controls)
     try:
+        robot.bell_tracker.reset()
         center_front_pole(robot)
         approach_front_pole(robot)
         center_front_pole(robot)
         attach_to_pole(robot)
 
-        print(f"[CLIMB-PASSIVE] Climbing with AI bell-circle tracking at speed={setting(robot, 'climb_fast_speed', robot.climb_speed):.2f}")
-        if passive_climb_strike(robot):
+        print(f"[CLIMB] Climbing at speed={robot.climb_speed:.2f}")
+        if climb_until_bell(robot):
+            # robot.motors.stop() # run motors at ~0.5 to hold position after detecting bell
             robot.motors.forward(robot.climb_hold_speed)
-            if hasattr(robot, "passive_climb_complete"):
-                robot.passive_climb_complete()
-            else:
-                robot.state = "done"
+            robot.bell_detected()
         elif robot.state == "climbing_pole":
             robot.climb_failed()
     finally:
