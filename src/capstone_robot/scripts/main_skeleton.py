@@ -151,9 +151,23 @@ class CapstoneRobot(object):
         self.climb_attach_speed = 0.5
         self.climb_attach_seconds = 2.0
         self.climb_speed = 0.6
+        self.climb_fast_speed = 0.8
         self.climb_bell_stable_frames_required = 3
         self.climb_max_seconds = 20.0
         self.climb_hold_speed = 0.3
+        self.climb_circle_center_deadband_px = 45
+        self.climb_circle_lock_frames_required = 3
+        self.climb_circle_lock_timeout_seconds = 5.0
+        self.climb_circle_steer_gain = 0.35
+        self.climb_circle_max_steer = 0.25
+        self.climb_circle_search_turn_speed = 0.25
+        self.climb_circle_hit_radius_px = 115
+        self.climb_circle_lost_after_frames = 8
+        self.climb_passive_hit_cycles = 2
+        self.climb_passive_min_hit_interval_seconds = 3.0
+        self.climb_passive_descend_speed = 0.25
+        self.climb_passive_descend_seconds = 0.8
+        self.climb_passive_hold_seconds = 1.0
         
         # Initialize Finite State Machine
         self.machine = Machine(model=self, states=CapstoneRobot.states, initial='searching_pole')
@@ -164,6 +178,7 @@ class CapstoneRobot(object):
         self.machine.add_transition(trigger='aligned', source='aligning_bell', dest='climbing_pole')
         self.machine.add_transition(trigger='bell_detected', source='climbing_pole', dest='striking_bell')
         self.machine.add_transition(trigger='climb_failed', source='climbing_pole', dest='done')
+        self.machine.add_transition(trigger='passive_climb_complete', source='climbing_pole', dest='done')
         self.machine.add_transition(trigger='mission_complete', source='striking_bell', dest='done')
 
     def detect_pole(self):

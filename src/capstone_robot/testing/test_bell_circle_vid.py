@@ -3,12 +3,12 @@ import argparse
 import cv2
 
 from capstone_robot.utils import find_repo_root
-from capstone_robot.vision.bell_circle import BellCircle
+from capstone_robot.vision.bell_circle_climb import BellCircle
 
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_align - Trim.mp4"
-
+DEFAULT_VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may25/may25_align_trim.mp4"
+DEFAULT_VID_PATH = REPO_ROOT / "src/capstone_robot/data/videos/may27/bell_strike_controls.mp4"
 
 def draw_detection(img, detection):
     vis = img.copy()
@@ -28,7 +28,13 @@ def main():
     parser.add_argument("--play", action="store_true", help="Play continuously instead of stepping frame by frame")
     args = parser.parse_args()
 
-    detector = BellCircle(color_format="bgr")
+    detector = BellCircle(color_format="bgr",
+        dp=1.5,
+        min_dist=5,
+        param1=50,
+        param2=50,
+        min_radius=10,
+        max_radius=50,)
     cap = cv2.VideoCapture(str(args.video))
     if not cap.isOpened():
         raise RuntimeError(f"Could not open video: {args.video}")

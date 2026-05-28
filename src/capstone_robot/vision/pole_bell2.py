@@ -27,6 +27,11 @@ def near_border(x, y, width, height, margin=8):
     return x < margin or x > width - margin or y < margin or y > height - margin
 
 
+def image_scale(frame_shape, base_short_side=480.0):
+    height, width = frame_shape[:2]
+    return max(0.5, min(height, width) / base_short_side)
+
+
 def gray_from_frame(frame, color_format):
     if color_format == "rgb":
         return cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
@@ -279,14 +284,15 @@ class PoleBellTracker2:
         max_angle_from_vertical_deg=35,
         angle_group_deg=12,
         smooth_alpha=0.65,
+        base_short_side=480.0,
     ):
         self.color_format = color_format
         self.border_margin = border_margin
         self.max_angle_from_vertical_deg = max_angle_from_vertical_deg
         self.angle_group_deg = angle_group_deg
         self.smooth_alpha = smooth_alpha
+        self.base_short_side = base_short_side
         self.previous_line = None
-        self.bell_detector = BellCircle(color_format=color_format)
 
     def reset(self):
         self.previous_line = None
@@ -295,17 +301,24 @@ class PoleBellTracker2:
         return detect_pole_bell_alignment(frame, tracker=self, color_format=self.color_format)
 
     def detect_pole_line(self, frame):
+        scale = image_scale(frame.shape, self.base_short_side)
         border_candidates = get_line_candidates(
             frame,
             color_format=self.color_format,
-            border_margin=self.border_margin,
+            border_margin=max(4, int(round(self.border_margin * scale))),
+            min_line_length=max(20, int(round(40 * scale))),
+            max_line_gap=max(10, int(round(20 * scale))),
+            hough_threshold=max(25, int(round(40 * np.sqrt(scale)))),
             max_angle_from_vertical_deg=self.max_angle_from_vertical_deg,
             require_border=True,
         )
         all_candidates = get_line_candidates(
             frame,
             color_format=self.color_format,
-            border_margin=self.border_margin,
+            border_margin=max(4, int(round(self.border_margin * scale))),
+            min_line_length=max(20, int(round(40 * scale))),
+            max_line_gap=max(10, int(round(20 * scale))),
+            hough_threshold=max(25, int(round(40 * np.sqrt(scale)))),
             max_angle_from_vertical_deg=self.max_angle_from_vertical_deg,
             require_border=False,
         )
@@ -313,6 +326,11 @@ class PoleBellTracker2:
             border_candidates,
             all_candidates,
             frame.shape,
+            min_top_width_px=max(4, int(round(6 * scale))),
+            min_bottom_width_px=max(6, int(round(10 * scale))),
+            max_bottom_width_px=max(30, int(round(110 * scale))),
+            min_taper_px=max(1, int(round(2 * scale))),
+            single_edge_center_offset_px=max(10, int(round(28 * scale))),
             pair_angle_deg=self.angle_group_deg,
         )
         if line is None:
@@ -325,7 +343,14 @@ class PoleBellTracker2:
         return self.previous_line
 
     def detect_bell(self, frame):
-        detection = self.bell_detector.detect(frame)
+        scale = image_scale(frame.shape, self.base_short_side)
+        detector = BellCircle(
+            color_format=self.color_format,
+            min_dist=max(20, int(round(60 * scale))),
+            min_radius=max(5, int(round(10 * scale))),
+            max_radius=max(15, int(round(30 * scale))),
+        )
+        detection = detector.detect(frame)
         return None if detection is None else detection.circle
 
 
@@ -346,7 +371,13 @@ def smooth_line(previous_line, new_line, alpha):
 
 
 def detect_bell(frame, color_format="rgb"):
-    detection = BellCircle(color_format=color_format).detect(frame)
+    scale = image_scale(frame.shape)
+    detection = BellCircle(
+        color_format=color_format,
+        min_dist=max(20, int(round(60 * scale))),
+        min_radius=max(5, int(round(10 * scale))),
+        max_radius=max(15, int(round(30 * scale))),
+    ).detect(frame)
     return None if detection is None else detection.circle
 
 

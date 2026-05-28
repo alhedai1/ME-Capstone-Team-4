@@ -10,7 +10,7 @@ import math
 IMG_PATH = "../data/extracted_frames/may25/may25_align_trim/frame_000100.jpg"
 IMG_FOLDER = "../data/extracted_frames/may25/may25_align_trim"
 VID_PATH = "../data/videos/may26/recording.mp4"
-VID_PATH = "../data/videos/may25/may25_align_trim.mp4"
+VID_PATH = "../data/videos/may25/may25_alignright.mp4"
 IMG_PATHS = [path for path in Path(IMG_FOLDER).iterdir()]
 
 def show(img, title="", cmap=None, size=(8, 6)):
@@ -264,7 +264,7 @@ def detect_lines(frame):
     # frame = cv2.imread(IMG_PATH)
     if frame is None:
         raise FileNotFoundError(f"Could not read image: {IMG_PATH}")
-    frame = rotate_frame(frame, "180")
+    frame = rotate_frame(frame, "ccw")
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
