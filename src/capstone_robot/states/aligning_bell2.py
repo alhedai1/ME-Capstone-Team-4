@@ -461,8 +461,8 @@ def orbit_seconds_from_error(robot, error_px):
 def orbit_step(robot, bell_side, error_px):
     reverse_speed = setting(robot, "pole_bell_reverse_speed", 0.25)
     reverse_seconds = setting(robot, "pole_bell_reverse_seconds", 0.25)
-    # turn_seconds = orbit_seconds_from_error(robot, error_px) * setting(robot, "pole_bell_turn_time_scale", 0.75)
-    turn_seconds = setting(robot, "pole_bell_turn_seconds", 1.5)
+    turn_seconds = orbit_seconds_from_error(robot, error_px) * setting(robot, "pole_bell_turn_time_scale", 0.75)
+    # turn_seconds = setting(robot, "pole_bell_turn_seconds", 1.5)
     forward_seconds = orbit_seconds_from_error(robot, error_px)
     settle_seconds = setting(robot, "pole_bell_settle_seconds", 0.15)
     turn_speed = setting(robot, "align_turn_speed", 0.3)

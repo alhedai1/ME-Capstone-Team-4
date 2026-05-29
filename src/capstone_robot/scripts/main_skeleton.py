@@ -67,8 +67,8 @@ class CapstoneRobot(object):
 
     def __init__(self):
         # Hardware Setup (Adjust GPIO pins based on your hardware)
-        self.left_rpwm = 'BOARD11'
-        self.left_lpwm = 'BOARD7'
+        self.left_rpwm = 'BOARD16'
+        self.left_lpwm = 'BOARD18'
         self.right_rpwm = 'BOARD12'
         self.right_lpwm = 'BOARD35'
         self.motors = Robot(left=(self.left_lpwm, self.left_rpwm), right=(self.right_lpwm, self.right_rpwm))
@@ -102,21 +102,21 @@ class CapstoneRobot(object):
         self.preview_server.start()
         print("Preview stream: http://<RPI_IP_ADDRESS>:1234")
 
-        self.verbose = False
+        self.verbose = True
 
         ### CONTROL LOOP
         self.control_loop_period_seconds = 0.05  # 20 Hz control/update target
 
         ### SEARCHING POLE
         self.search_startup_wait_seconds = 1.0
-        self.pole_conf_threshold = 0.7
+        self.pole_conf_threshold = 0.6
         self.pole_center_deadband_px = 20
         self.pole_stable_frames_required = 5
         self.search_missed_frame_limit = 6
         self.pole_smooth_alpha = 0.5
-        self.search_turn_speed = 0.25
-        self.center_turn_speed = 0.25  # max centering turn speed
-        self.center_turn_min_speed = 0.25
+        self.search_turn_speed = 0.3
+        self.center_turn_speed = 0.3  # max centering turn speed
+        self.center_turn_min_speed = 0.3
         self.center_turn_gain = 0.6
         self.center_turn_derivative_gain = 0.03
         self.pole_search_initial_direction = "right"
@@ -133,7 +133,7 @@ class CapstoneRobot(object):
         self.approach_missed_frame_limit = 10
 
         ### ALIGNING POLE/BELL
-        self.align_min_pole_width_fraction = 0.06
+        self.align_min_pole_width_fraction = 0.05
         self.align_turn_speed = 0.5
         # self.align_quarter_turn_seconds = 1
         # self.orbit_speed = 0.5
@@ -142,10 +142,10 @@ class CapstoneRobot(object):
         self.alignment_missed_frame_limit = 15
         self.pole_bell_error_smooth_alpha = 0.45
 
-        self.pole_bell_error_threshold_px = 20
+        self.pole_bell_error_threshold_px = 50
         self.pole_bell_max_orbit_steps = 20
         self.pole_bell_reverse_speed = 0.3
-        self.pole_bell_reverse_seconds = 1.0
+        self.pole_bell_reverse_seconds = 2.0
         self.pole_bell_turn_seconds = 1.5
         self.pole_bell_orbit_forward_speed = 0.3
         self.pole_bell_orbit_turn_bias = 0.1
@@ -171,7 +171,7 @@ class CapstoneRobot(object):
         self.climb_max_seconds = 50.0
         self.climb_hold_speed = 0.3
         self.climb_circle_lost_after_frames = 10
-        self.climb_passive_min_hit_interval_seconds = 3.0
+        self.climb_passive_min_hit_interval_seconds = 6.0
         self.climb_ramp_start_speed = 0.4
         self.climb_ramp_seconds = 0.75
         self.climb_ramp_steps = 8
@@ -320,15 +320,15 @@ if __name__ == "__main__":
     robot = CapstoneRobot()
     try:
         # print(robot.state)
-        robot.search_for_pole()
+ #       robot.search_for_pole()
         # print(robot.state)
         # robot.state = "approaching_pole"
-        robot.approach_pole()
+#        robot.approach_pole()
         # robot.run_robot()
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()
-        # robot.state = "climbing_pole"
-        # robot.climb_pole()
+        robot.state = "climbing_pole"
+        robot.climb_pole()
         # robot.state = "striking_bell"
         # robot.strike_bell()
     finally:
