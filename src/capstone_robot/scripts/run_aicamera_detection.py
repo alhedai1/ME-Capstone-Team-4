@@ -15,8 +15,8 @@ import sys
 from capstone_robot.utils import *
 
 REPO_ROOT = find_repo_root(__file__)
-DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole_imx/network.rpk"
-DEFAULT_LABELS = REPO_ROOT / "src/capstone_robot/models/pole_imx/labels.txt"
+DEFAULT_MODEL = REPO_ROOT / "src/capstone_robot/models/pole_imx_new/network.rpk"
+DEFAULT_LABELS = REPO_ROOT / "src/capstone_robot/models/pole_imx_new/labels.txt"
 
 
 @dataclass
