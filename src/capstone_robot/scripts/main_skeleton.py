@@ -29,8 +29,8 @@ from capstone_robot.vision.pole_bell2 import PoleBellTracker
 
 REPO_ROOT = find_repo_root(__file__)
 
-MODEL_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx/network.rpk"
-LABELS_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx/labels.txt"
+MODEL_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx_new/network.rpk"
+LABELS_PATH = REPO_ROOT / "src/capstone_robot/models/pole_imx_new/labels.txt"
 
 ### CHANGE PICAM MODULE 3 CONTROLS (STRIKING - ALIGNING)
 
@@ -159,11 +159,11 @@ class CapstoneRobot(object):
 
         ### CLIMBING POLE
         self.climb_center_timeout_seconds = 2.0
-        self.climb_backoff_speed = 0.2
-        self.climb_backoff_seconds = 0.4
+        self.climb_backoff_speed = 0.0
+        self.climb_backoff_seconds = 0.5
         self.climb_backoff_settle_seconds = 0.2
-        self.start_climb_settle_seconds = 0.5 ## settle after attach, before climb
-        self.climb_attach_speed = 0.5
+        self.start_climb_settle_seconds = 0.1 ## settle after attach, before climb
+        self.climb_attach_speed = 0.7
         self.climb_attach_seconds = 1.0
         self.climb_speed = 0.6
         self.climb_full_speed = 1.0
@@ -320,10 +320,10 @@ if __name__ == "__main__":
     robot = CapstoneRobot()
     try:
         # print(robot.state)
- #       robot.search_for_pole()
+        robot.search_for_pole()
         # print(robot.state)
         # robot.state = "approaching_pole"
-#        robot.approach_pole()
+        robot.approach_pole()
         # robot.run_robot()
         # robot.state = 'aligning_bell'
         # robot.align_to_bell()

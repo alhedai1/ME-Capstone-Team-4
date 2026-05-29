@@ -138,7 +138,7 @@ def run(robot):
 
             if phase == "climb":
                 if detection is None:
-                    time.sleep(1)
+                    # time.sleep(1)
                     hit_count += 1
                     bell_reacquired_at = None
                     phase = "descend"
