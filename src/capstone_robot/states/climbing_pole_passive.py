@@ -117,8 +117,8 @@ def attach_to_pole(robot):
     )
     robot.motors.forward(robot.climb_attach_speed)
     time.sleep(robot.climb_attach_seconds)
-    robot.motors.stop()
-    time.sleep(robot.start_climb_settle_seconds)
+    # robot.motors.stop()
+    # time.sleep(robot.start_climb_settle_seconds)
 
 def pi_camera_still_sees_bell_after_climb_attempt(robot, climb_speed):
     delay_seconds = setting(robot, "climb_failure_check_delay_seconds", 1.5)
@@ -209,6 +209,7 @@ def run(robot):
                 time.sleep(0.1)
                 robot.motors.forward(0.2)
                 time.sleep(0.1)
+                center_front_pole(robot)
 
             attach_to_pole(robot)
             ramp_climb_speed(robot, climb_speed)
@@ -238,7 +239,7 @@ def run(robot):
 
             if phase == "climb":
                 if detection is None:
-                    # time.sleep(1)
+                    time.sleep(1)
                     hit_count += 1
                     bell_reacquired_at = None
                     phase = "descend"

@@ -173,7 +173,7 @@ class CapstoneRobot(object):
         self.climb_hold_speed = 0.3
         self.climb_circle_lost_after_frames = 10
         self.climb_passive_min_hit_interval_seconds = 3.0
-        self.climb_ramp_start_speed = 0.4
+        self.climb_ramp_start_speed = 0.6
         self.climb_ramp_seconds = 0.75
         self.climb_ramp_steps = 8
 
